@@ -6,4 +6,6 @@
 #     make update-deps
 
 # This is most of it: contains the repository scanning tools
-jupyterlab-controller
+git+https://github.com/lsst-sqre/jupyterlab-controller
+semver
+
