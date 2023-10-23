@@ -6,6 +6,7 @@ from jupyterlabcontroller.storage.docker import DockerStorageClient
 from jupyterlabcontroller.services.source.docker import DockerImageSource
 from jupyterlabcontroller.services.source.gar import GARImageSource
 
+
 class Factory:
     """Build reaper components.
 
@@ -13,7 +14,7 @@ class Factory:
     ----------
     config: Config
         Reaper configuration.
-    
+
     logger
         Logger to use for messages.
     """
