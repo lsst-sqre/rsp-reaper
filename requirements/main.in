@@ -6,6 +6,10 @@
 #     make update-deps
 
 # This is most of it: contains the repository scanning tools
-git+https://github.com/lsst-sqre/jupyterlab-controller
+# That doesn't have delete methods; someday we should put it in Safir, but
+# for now we'll just roll our own.
+# git+https://github.com/lsst-sqre/jupyterlab-controller
 semver
+google-cloud
+
 

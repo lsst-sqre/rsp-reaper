@@ -4,9 +4,9 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=requirements/main.txt requirements/main.in
 #
-# WARNING: pip install will require the following package to be hashed.
-# Consider using a hashable URL like https://github.com/jazzband/pip-tools/archive/SOMECOMMIT.zip
-jupyterlab-controller @ git+https://github.com/lsst-sqre/jupyterlab-controller
+google-cloud==0.34.0 \
+    --hash=sha256:01430187cf56df10a9ba775dd547393185d4b40741db0ea5889301f8e7a9d5d3 \
+    --hash=sha256:fb1ab7b0548fe44b3d538041f0a374505b7f990d448a935ea36649c5ccab5acf
     # via -r requirements/main.in
 semver==3.0.2 \
     --hash=sha256:6253adb39c70f6e51afed2fa7152bcd414c411286088fb4b9effb133885ab4cc \
