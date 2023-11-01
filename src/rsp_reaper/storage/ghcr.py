@@ -1,14 +1,16 @@
 """Storage driver for ghcr.io package repository."""
 
-from ..models.image import Image, DATEFMT
-from ..models.registry_category import RegistryCategory
-
-from dataclasses import dataclass
-from typing import Any
 import datetime
-import httpx
 import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import httpx
 import structlog
+
+from ..models.image import DATEFMT, Image
+from ..models.registry_category import RegistryCategory
 
 
 @dataclass
@@ -30,8 +32,8 @@ class GhcrClient(httpx.Client):
         self._namespace = namespace
         self._repository = repository
         self._auth: str | None = None
-        self._image_by_digest: dict[str, GhcrImage] = dict()
-        self._image_by_id: dict[str, Image] = dict()
+        self._image_by_digest: dict[str, GhcrImage] = {}
+        self._image_by_id: dict[str, Image] = {}
         self._logger = structlog.get_logger()
 
     def authenticate(self, token: str) -> None:
@@ -42,10 +44,15 @@ class GhcrClient(httpx.Client):
             f"{self._url}/orgs/{self._namespace}/packages"
             f"/container/{self._repository}/versions"
         )
-        params = {"page_size": 100}
+        page_size = 100
+        params = {"per_page": page_size}
         page = 1
         results: list[dict[str, Any]] = []
         while True:
+            self._logger.debug(
+                f"Requesting {self._namespace}/{self._repository}: images "
+                f"{(page -1) *page_size + 1}-{page * page_size}"
+            )
             params["page"] = page
             r = self.get(url, params=params)
             r.raise_for_status()
@@ -61,7 +68,7 @@ class GhcrClient(httpx.Client):
             # GHCR doesn't do fractional seconds, but does keep date in UTC
             date = datetime.datetime.strptime(
                 f"{i['updated_at'][:-1]}.000000Z", DATEFMT
-            )
+            ).astimezone(tz=datetime.UTC)
             img = Image(digest=digest, tags=tags, date=date)
             ghcr_image = GhcrImage(image=img, id=id)
             self._image_by_digest[digest] = ghcr_image
@@ -71,32 +78,32 @@ class GhcrClient(httpx.Client):
         )
 
     def debug_dump_images(self, filename: str) -> None:
-        objs: dict[str, Any] = dict()
+        objs: dict[str, Any] = {}
         for digest in self._image_by_digest:
             img = self._image_by_digest[digest].image
             id = self._image_by_digest[digest].id
             obj_img = img.to_dict()
-            objs[digest] = dict()
+            objs[digest] = {}
             objs[digest]["image"] = obj_img
             objs[digest]["id"] = id
         dd: dict[str, Any] = {
             "metadata": {"category": RegistryCategory.GHCR.value},
             "data": objs,
         }
-        with open(filename, "w") as f:
+        with Path.open(filename, "w") as f:
             json.dump(dd, f, indent=2)
 
     def debug_load_images(self, filename: str) -> None:
-        with open(filename, "r") as f:
+        with Path.open(filename) as f:
             inp = json.load(f)
         if inp["metadata"]["category"] != RegistryCategory.GHCR.value:
             raise ValueError(
-                f"Dump is from {jsons['metadata']['category']}, "
+                f"Dump is from {inp['metadata']['category']}, "
                 f"not {RegistryCategory.GHCR.value}"
             )
         jsons = inp["data"]
-        self._image_by_digest = dict()
-        self._image_by_id = dict()
+        self._image_by_digest = {}
+        self._image_by_id = {}
         for digest in jsons:
             tags = jsons[digest]["image"]["tags"]
             date = jsons[digest]["image"]["date"]
@@ -104,7 +111,9 @@ class GhcrClient(httpx.Client):
             img = Image(
                 digest=digest,
                 tags=set(tags),
-                date=datetime.datetime.strptime(date, DATEFMT),
+                date=datetime.datetime.strptime(date, DATEFMT).astimezone(
+                    datetime.UTC
+                ),
             )
             ghcr_img = GhcrImage(id=id, image=Image)
             self._image_by_digest[digest] = ghcr_img
@@ -119,6 +128,7 @@ class GhcrClient(httpx.Client):
         return ret
 
     def delete_untagged(self) -> None:
+        """Delete all untagged images."""
         untagged = self._find_untagged()
         count = 0
         for u in untagged:

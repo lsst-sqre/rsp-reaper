@@ -9,7 +9,8 @@
 # That doesn't have delete methods; someday we should put it in Safir, but
 # for now we'll just roll our own.
 # git+https://github.com/lsst-sqre/jupyterlab-controller
+google-cloud-artifact-registry
+httpx
 semver
-google-cloud
-
+structlog
 

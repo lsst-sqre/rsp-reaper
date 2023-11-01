@@ -138,3 +138,6 @@ dmypy.json
 
 # VSCode
 .vscode/
+
+# AJT manual testing
+harnesses/

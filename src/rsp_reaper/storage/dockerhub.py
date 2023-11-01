@@ -1,14 +1,16 @@
 # Enough of the Docker Hub API to authenticate, to list images, to get
 # image digests and tags, and to delete images.
 
-from ..models.image import Image, DATEFMT
-from ..models.registry_category import RegistryCategory
-
-import asyncio
 import datetime
-import httpx
 import json
+from pathlib import Path
+from typing import Any
+
+import httpx
 import structlog
+
+from ..models.image import DATEFMT, Image
+from ..models.registry_category import RegistryCategory
 
 LATEST_TAGS = ("latest", "latest_release", "latest_weekly", "latest_daily")
 
@@ -21,7 +23,7 @@ class DockerHubClient(httpx.Client):
         self._namespace = namespace
         self._repository = repository
         self._auth: str | None = None
-        self._images: dict[str, Image] = dict()
+        self._images: dict[str, Image] = {}
         self._logger = structlog.get_logger()
 
     def authenticate(self, username: str, password: str) -> None:
@@ -37,9 +39,14 @@ class DockerHubClient(httpx.Client):
             f"{self._url}/v2/namespaces/{self._namespace}/repositories/"
             f"{self._repository}/tags"
         )
-        params = {"page_size": 100}
+        page_size = 100
+        count = 0
+        params = {"page_size": page_size}
         while next_page:
-            self._logger.debug(f"GET {next_page}")
+            self._logger.debug(
+                f"Requesting {self._namespace}/{self._repository}: images "
+                f"{count*page_size + 1}-{(count+1) * page_size}"
+            )
             r = self.get(next_page, params=params)
             r.raise_for_status()
             obj = r.json()
@@ -55,10 +62,11 @@ class DockerHubClient(httpx.Client):
                     digest = img["digest"]
                     self._upsert_image(digest, date, tag)
             next_page = obj["next"]
+            count += 1
         self._logger.debug(f"Found {len(list(self._images.keys()))} images")
 
     def _upsert_image(self, digest: str, date: str, tag: str | None) -> None:
-        dt = datetime.datetime.strptime(date, DATEFMT)
+        dt = datetime.datetime.strptime(date, DATEFMT).astimezone(datetime.UTC)
         if self._images.get(digest, None) and tag:
             if self._images[digest].tags is None:  # empirically happens...
                 self._images[digest].tags = set()
@@ -70,7 +78,7 @@ class DockerHubClient(httpx.Client):
             self._images[digest] = Image(digest=digest, tags=tags, date=dt)
 
     def debug_dump_images(self, filename: str) -> None:
-        objs: dict[str, dict[str, str]] = dict()
+        objs: dict[str, dict[str, str]] = {}
         for digest in self._images:
             img = self._images[digest]
             obj_img = img.to_dict()
@@ -79,26 +87,28 @@ class DockerHubClient(httpx.Client):
             "metadata": {"category": RegistryCategory.DOCKERHUB.value},
             "data": objs,
         }
-        with open(filename, "w") as f:
+        with Path.open(filename, "w") as f:
             json.dump(dd, f, indent=2)
 
     def debug_load_images(self, filename: str) -> None:
-        with open(filename, "r") as f:
+        with Path.open(filename) as f:
             inp = json.load(f)
         if inp["metadata"]["category"] != RegistryCategory.DOCKERHUB.value:
             raise ValueError(
-                f"Dump is from {jsons['metadata']['category']}, "
+                f"Dump is from {inp['metadata']['category']}, "
                 f"not {RegistryCategory.DOCKERHUB.value}"
             )
         jsons = inp["data"]
-        self._images = dict()
+        self._images = {}
         for digest in jsons:
             tags = jsons[digest]["tags"]
             date = jsons[digest]["date"]
             self._images[digest] = Image(
                 digest=digest,
                 tags=set(tags),
-                date=datetime.datetime.strptime(date, DATEFMT),
+                date=datetime.datetime.strptime(date, DATEFMT).astimezone(
+                    datetime.UTC
+                ),
             )
 
     def _find_untagged(self) -> list[Image]:
@@ -110,22 +120,21 @@ class DockerHubClient(httpx.Client):
         return untagged
 
     def deprecated_delete_untagged(self) -> None:
+        """Delete all untagged images."""
         ### This API goes away Nov. 15, 2023
         #
         # But it doesn't seem to actually remove anything as of October 20,
         # 2023.
-        manifests: list[dict[str, str]] = []
-        untagged = [x.digest for x in self._find_untagged()]
-        for u in untagged:
-            manifests.append({"repository": self._repository, "digest": u})
-        now = datetime.datetime.utcnow()
-        then = now - datetime.timedelta(days=30)
-        active_from = then.strftime(DATEFMT) + "Z"
+        manifests = [
+            {"repository": self._repository, "digest": x.digest}
+            for x in self._find_untagged()
+        ]
+        now = datetime.datetime.now(tz=datetime.UTC)
+        now - datetime.timedelta(days=30)
         count = 0
         for m in manifests:
             payload = {
                 "dry_run": False,
-                "active_from": active_from,
                 "manifests": [m],
             }
             r = self.post(
@@ -143,9 +152,14 @@ class DockerHubClient(httpx.Client):
             f"{self._url}/v2/namespaces/{self._namespace}"
             f"/repositories/{self._repository}/images"
         )
-        params = {"page_size": 100}
+        page_size = 100
+        params = {"page_size": page_size}
+        count = 0
         while next_page:
-            self._logger.debug(f"GET {next_page}")
+            self._logger.debug(
+                f"Requesting {self._namespace}/{self._repository}: images "
+                f"{count*page_size + 1}-{(count+1) * page_size}"
+            )
             r = self.get(next_page, params=params)
             r.raise_for_status()
             obj = r.json()
@@ -165,4 +179,5 @@ class DockerHubClient(httpx.Client):
                             continue
                         self._upsert_image(digest, date, tag)
             next_page = obj["next"]
+            count += 1
         self._logger.debug(f"Found {len(list(self._images.keys()))} images")
