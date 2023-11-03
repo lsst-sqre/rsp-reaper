@@ -85,9 +85,6 @@ class GARClient:
             ret[digest] = Image(digest=digest, tags=tags, date=dt)
         return ret
 
-    def _image_to_name(self, img: Image) -> str:
-        return f"{self._parent}/dockerImages/{self._image}@{img.digest}"
-
     def debug_dump_images(self, filename: str) -> None:
         objs: dict[str, dict[str, str]] = {}
         for digest in self._images:
@@ -122,6 +119,9 @@ class GARClient:
                 ),
             )
 
+    def _image_to_name(self, img: Image) -> str:
+        return f"{self._parent}/packages/{self._image}/versions/{img.digest}"
+
     def _find_untagged(self) -> list[Image]:
         return [x for x in self._images.values() if not x.tags]
 
@@ -138,7 +138,6 @@ class GARClient:
             self._logger.debug(
                 f"Waiting for deletion of {self._path}@{digest} to complete"
             )
-            response = operation.result()
-            self._logger.debug(f"Deletion -> {response}")
+            operation.result()
             count += 1
         self._logger.debug(f"Deleted {count} images")
