@@ -121,7 +121,7 @@ class DockerHubClient(httpx.Client):
 
     def deprecated_delete_untagged(self) -> None:
         """Delete all untagged images."""
-        ### This API goes away Nov. 15, 2023
+        ### This API goes away Nov. 15, 2023.  Possibly December 11.
         #
         # But it doesn't seem to actually remove anything as of October 20,
         # 2023.
@@ -147,7 +147,7 @@ class DockerHubClient(httpx.Client):
         self._logger.debug(f"Deleted {count} images")
 
     def deprecated_find_all(self) -> None:
-        ### This API goes away Nov. 15, 2023
+        ### This API goes away Nov. 15, 2023.  Possibly December 11.
         next_page = (
             f"{self._url}/v2/namespaces/{self._namespace}"
             f"/repositories/{self._repository}/images"
