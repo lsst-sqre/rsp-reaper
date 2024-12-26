@@ -1,8 +1,6 @@
 """Abstract data types for handling RSP image tags.  This is borrowed from
-https://github.com/lsst-sqre/jupyterlab-controller
+https://github.com/lsst-sqre/nublado/controller .
 """
-
-from __future__ import annotations
 
 import contextlib
 import re
@@ -211,7 +209,7 @@ class RSPImageTag:
     def _from_match(
         cls, image_type: RSPImageType, match: re.Match, tag: str
     ) -> Self:
-        """Helper function to create an `RSPImageTag` from a regex match.
+        """Create an `RSPImageTag` from a regex match.
 
         Parameters
         ----------
@@ -478,7 +476,7 @@ class RSPImageTagCollection:
         weeklies: int = 0,
         dailies: int = 0,
         include: set[str] | None = None,
-    ) -> RSPImageTagCollection:
+    ) -> Self:
         """Return a subset of the tag collection.
 
         Parameters
@@ -514,4 +512,4 @@ class RSPImageTagCollection:
             )
 
         # Return the results.
-        return RSPImageTagCollection(tags)
+        return type(self)(tags)

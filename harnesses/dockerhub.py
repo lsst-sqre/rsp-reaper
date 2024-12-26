@@ -1,3 +1,5 @@
+"""Interactive harness for Docker Hub."""
+
 import os
 
 from rsp_reaper.storage.dockerhub import DockerHubClient

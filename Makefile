@@ -5,14 +5,15 @@ help:
 	@echo "make run - Run dev instance of service locally"
 	@echo "make update - Update pinned dependencies and run make init"
 	@echo "make update-deps - Update pinned dependencies"
-	@echo "make update-deps-no-hashes - Pin dependencies without hashes"
 
 .PHONY: init
 init:
-	pip install --editable .
-	pip install --upgrade -r requirements/main.txt -r requirements/dev.txt
+	pip install --upgrade pip uv
+	uv pip install --editable .
+	uv pip install --upgrade -r requirements/main.txt \
+            -r requirements/dev.txt
 	rm -rf .tox
-	pip install --upgrade pre-commit tox
+	uv pip install --upgrade pre-commit tox
 	pre-commit install
 
 .PHONY: run
@@ -27,21 +28,8 @@ update: update-deps init
 # allowed to appear in a hashed dependency file.
 .PHONY: update-deps
 update-deps:
-	pip install --upgrade pip-tools pip setuptools
-	pip-compile --upgrade --resolver=backtracking --build-isolation \
-	    --allow-unsafe --generate-hashes                            \
+	uv pip install --upgrade pip-tools pip setuptools
+	uv pip compile --upgrade --build-isolation --generate-hashes \
 	    --output-file requirements/main.txt requirements/main.in
-	pip-compile --upgrade --resolver=backtracking --build-isolation \
-	    --allow-unsafe --generate-hashes 				\
-	    --output-file requirements/dev.txt requirements/dev.in
-
-# Useful for testing against a Git version of Safir.
-.PHONY: update-deps-no-hashes
-update-deps-no-hashes:
-	pip install --upgrade pip-tools pip setuptools
-	pip-compile --upgrade --resolver=backtracking --build-isolation \
-	    --allow-unsafe                                              \
-	    --output-file requirements/main.txt requirements/main.in
-	pip-compile --upgrade --resolver=backtracking --build-isolation \
-	    --allow-unsafe						\
+	uv pip compile --upgrade --build-isolation --generate-hashes \
 	    --output-file requirements/dev.txt requirements/dev.in

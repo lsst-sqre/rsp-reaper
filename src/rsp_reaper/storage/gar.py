@@ -1,3 +1,5 @@
+"""Storage client for Google Artifact Registry."""
+
 import datetime
 import json
 from pathlib import Path

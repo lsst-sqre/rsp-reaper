@@ -1,3 +1,5 @@
+"""Interactive harness for GitHub Container Registry."""
+
 import os
 
 from rsp_reaper.storage.ghcr import GhcrClient

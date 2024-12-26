@@ -1,3 +1,5 @@
+"""Interactive harness for Google Artifact Registry."""
+
 from rsp_reaper.storage.gar import GARClient
 
 c = GARClient(

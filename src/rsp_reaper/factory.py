@@ -1,10 +1,13 @@
 """Component factory."""
 
-from .config import Config
+from collections.abc import AsyncIterator
+from contextlib import aclosing, asynccontextmanager
+from typing import Self
 
-from jupyterlabcontroller.storage.docker import DockerStorageClient
-from jupyterlabcontroller.services.source.docker import DockerImageSource
-from jupyterlabcontroller.services.source.gar import GARImageSource
+import structlog
+from structlog.stdlib import BoundLogger
+
+from .config import Config
 
 
 class Factory:
@@ -36,7 +39,6 @@ class Factory:
         Factory
             Newly-created factory. Must be used as a context manager.
         """
-
         logger = structlog.get_logger(__name__)
         factory = cls(logger)
         async with aclosing(factory):

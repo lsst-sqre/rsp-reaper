@@ -1,10 +1,13 @@
-from .rsptag import RSPImageType
-from enum import Enum
-from dataclasses import dataclass, field, asdict
-from typing import Self
+"""Model for necessary information about container images."""
+
 import datetime
 import json
+from dataclasses import asdict, dataclass, field
+from typing import Self
+
 import semver
+
+from .rsptag import RSPImageType
 
 DATEFMT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
@@ -17,7 +20,7 @@ class Image:
     tags: set[str] = field(default_factory=set)
     date: datetime.datetime | None = None
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str | list[str]]:
         # Differs from asdict, in that set and datetime aren't
         # JSON-serializable, so we make them a list and a string.
         self_dict = asdict(self)
@@ -28,16 +31,18 @@ class Image:
         self_dict["date"] = self.date.strftime(DATEFMT)
         return self_dict
 
-    def toJSON(self) -> str:
-        return json.dumps(self_to_dict())
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict())
 
     @classmethod
-    def fromJSON(cls, inp: str) -> Self:
+    def from_json(cls, inp: str) -> Self:
         self_dict = json.loads(inp)
         return cls(
             digest=self_dict["digest"],
             tags=set(self_dict["tags"]),
-            date=datetime.datetime.strptime(self_dict["date"], DATEFMT),
+            date=datetime.datetime.strptime(
+                self_dict["date"], DATEFMT
+            ).replace(tzinfo=datetime.tz.utc),
         )
 
 

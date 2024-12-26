@@ -1,3 +1,5 @@
+"""Collection of types of container registries we might encounter."""
+
 from enum import Enum
 
 

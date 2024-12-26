@@ -1,4 +1,4 @@
-"""Storage driver for ghcr.io package repository."""
+"""Storage driver for ghcr.io package registry."""
 
 import datetime
 import json
@@ -15,11 +15,15 @@ from ..models.registry_category import RegistryCategory
 
 @dataclass
 class GhcrImage:
+    """Minimalist representation of container image at GHCR."""
+
     id: int
     image: Image
 
 
 class GhcrClient(httpx.Client):
+    """Storage client for communication with ghcr.io."""
+
     def __init__(self, namespace: str, repository: str) -> None:
         super().__init__()
         self.headers.update(

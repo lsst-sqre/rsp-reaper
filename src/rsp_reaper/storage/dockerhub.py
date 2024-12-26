@@ -1,5 +1,8 @@
-# Enough of the Docker Hub API to authenticate, to list images, to get
-# image digests and tags, and to delete images.
+"""Minimalist function set of the Docker Hub API.
+
+We must be able to list images, to get image digests and tags, and to
+delete images.
+"""
 
 import datetime
 import json
@@ -16,6 +19,8 @@ LATEST_TAGS = ("latest", "latest_release", "latest_weekly", "latest_daily")
 
 
 class DockerHubClient(httpx.Client):
+    """Client for talking to docker.io / hub.docker.com."""
+
     def __init__(self, namespace: str, repository: str) -> None:
         super().__init__()
         self.headers["content-type"] = "application/json"
