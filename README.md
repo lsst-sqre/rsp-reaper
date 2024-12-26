@@ -39,8 +39,8 @@ methods for removing images from a repository.
 
 ### Docker Storage Driver
 
-The reaper will depend on the Docker storage driver from [Jupyterlab
-Controller](https://github.com/lsst-sqre/jupyterlab-controller) to list
+The reaper will depend on the Docker storage driver from [Nublado
+Controller](https://github.com/lsst-sqre/nublado/controller) to list
 the repository contents for a given image, and to interpret the tags as
 defined in [SQR-059](https://sqr-059.lsst.io/).
 
