@@ -1,5 +1,7 @@
 """Component factory."""
 
+from __future__ import annotations
+
 from collections.abc import AsyncIterator
 from contextlib import aclosing, asynccontextmanager
 from typing import Self
@@ -7,7 +9,7 @@ from typing import Self
 import structlog
 from structlog.stdlib import BoundLogger
 
-from .config import Config
+from .config import ContainerRegistryConfig
 
 
 class Factory:
@@ -15,7 +17,7 @@ class Factory:
 
     Parameters
     ----------
-    config: Config
+    config: ContainerRegistryConfig
         Reaper configuration.
 
     logger
@@ -24,7 +26,9 @@ class Factory:
 
     @classmethod
     @asynccontextmanager
-    async def standalone(cls, config: Config) -> AsyncIterator[Self]:
+    async def standalone(
+        cls, config: ContainerRegistryConfig
+    ) -> AsyncIterator[Self]:
         """Async context manager for reaper components.
 
         Intended for the test suite.
@@ -32,7 +36,7 @@ class Factory:
         Parameters
         ----------
         config
-            Lab controller configuration
+            Container Registry configuration
 
         Yields
         ------
@@ -41,7 +45,7 @@ class Factory:
         """
         logger = structlog.get_logger(__name__)
         factory = cls(logger)
-        async with aclosing(factory):
+        async with aclosing(factory):  # type: ignore[type-var]
             yield factory
 
     def __init__(self, logger: BoundLogger) -> None:

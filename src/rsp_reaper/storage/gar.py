@@ -3,7 +3,6 @@
 import datetime
 import json
 from pathlib import Path
-from typing import Any
 
 import structlog
 from google.cloud.artifactregistry_v1 import (
@@ -13,11 +12,12 @@ from google.cloud.artifactregistry_v1 import (
 )
 from google.cloud.artifactregistry_v1.types import DockerImage
 
-from ..models.image import DATEFMT, Image
+from ..models.image import DATEFMT, Image, JSONImage
 from ..models.registry_category import RegistryCategory
+from .registry import ContainerRegistryClient
 
 
-class GARClient:
+class GARClient(ContainerRegistryClient):
     """Client for Google Artifact Registry.
 
     We assume we can use application default credentials.  It should be run
@@ -25,7 +25,13 @@ class GARClient:
     """
 
     def __init__(
-        self, location: str, project_id: str, repository: str, image: str
+        self,
+        location: str,
+        project_id: str,
+        repository: str,
+        image: str,
+        *,
+        dry_run: bool = False,
     ) -> None:
         self._location = location
         self._project_id = project_id
@@ -41,6 +47,7 @@ class GARClient:
         self._client = ArtifactRegistryClient()
         self._logger = structlog.get_logger()
         self._images: dict[str, Image] = {}
+        self._dry_run = dry_run
 
     def scan_repo(self) -> None:
         images: list[DockerImage] = []
@@ -67,7 +74,7 @@ class GARClient:
         self._logger.debug(f"Found {len(images)} images")
         self._images = self._gar_to_images(images)
 
-    def _gar_to_images(self, images: list[DockerImage]) -> list[Image]:
+    def _gar_to_images(self, images: list[DockerImage]) -> dict[str, Image]:
         ret: dict[str, Image] = {}
         for img in images:
             ut = img.update_time
@@ -87,22 +94,20 @@ class GARClient:
             ret[digest] = Image(digest=digest, tags=tags, date=dt)
         return ret
 
-    def debug_dump_images(self, filename: str) -> None:
-        objs: dict[str, dict[str, str]] = {}
+    def debug_dump_images(self, outputfile: Path) -> None:
+        objs: dict[str, JSONImage] = {}
         for digest in self._images:
             img = self._images[digest]
             obj_img = img.to_dict()
             objs[digest] = obj_img
-        dd: dict[str, Any] = {
+        dd: dict[str, dict[str, str] | dict[str, JSONImage]] = {
             "metadata": {"category": RegistryCategory.GAR.value},
             "data": objs,
         }
-        with Path.open(filename, "w") as f:
-            json.dump(dd, f, indent=2)
+        outputfile.write_text(json.dumps(dd, indent=2))
 
-    def debug_load_images(self, filename: str) -> None:
-        with Path.open(filename) as f:
-            inp = json.load(f)
+    def debug_load_images(self, inputfile: Path) -> None:
+        inp = json.loads(inputfile.read_text())
         if inp["metadata"]["category"] != RegistryCategory.GAR.value:
             raise ValueError(
                 f"Dump is from {inp['metadata']['category']}, "
@@ -117,7 +122,7 @@ class GARClient:
                 digest=digest,
                 tags=set(tags),
                 date=datetime.datetime.strptime(date, DATEFMT).astimezone(
-                    datetime.tz.utc
+                    datetime.UTC
                 ),
             )
 
@@ -131,15 +136,19 @@ class GARClient:
         """Delete all untagged images."""
         untagged = self._find_untagged()
         count = 0
+        dry = ""
+        if self._dry_run:
+            dry = " (not really)"
         for u in untagged:
             digest = u.digest
             request = DeleteVersionRequest(name=self._image_to_name(u))
             self._logger.debug(f"Deletion request: {request}")
-            # Don't understand what's wrong with the next line
-            operation = self._client.delete_version(request=request)
-            self._logger.debug(
-                f"Waiting for deletion of {self._path}@{digest} to complete"
-            )
-            operation.result()
+            if not self._dry_run:
+                # Don't understand what's wrong with the next line
+                operation = self._client.delete_version(request=request)
+                self._logger.debug(
+                    f"Waiting for deletion of {self._path}@{digest} to finish"
+                )
+                operation.result()
             count += 1
-        self._logger.debug(f"Deleted {count} images")
+        self._logger.debug(f"Deleted {count} images{dry}")

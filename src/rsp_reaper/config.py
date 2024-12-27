@@ -1,4 +1,4 @@
-"""Configuration for the reaper."""
+"""Configuration for a reaper for a particular container registry."""
 
 from dataclasses import dataclass
 
@@ -6,8 +6,8 @@ from .models.registry_category import RegistryCategory
 
 
 @dataclass
-class Auth:
-    """Generic authentication item."""
+class RegistryAuth:
+    """Generic authentication item for a container registry."""
 
     realm: str
     username: str
@@ -15,12 +15,12 @@ class Auth:
 
 
 @dataclass
-class Config:
-    """Top-level configuration item."""
+class ContainerRegistryConfig:
+    """Configuration for a particular container registry."""
 
     namespace: str
     repository: str
     registry: str
-    project: str | None = None
     category: RegistryCategory
-    auth: Auth | None = None
+    project: str | None = None
+    auth: RegistryAuth | None = None

@@ -7,5 +7,6 @@ c = GARClient(
     project_id="rubin-shared-services-71ec",
     repository="sciplat",
     image="sciplat-lab",
+    dry_run=True,
 )
 c.scan_repo()

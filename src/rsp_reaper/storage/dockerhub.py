@@ -7,29 +7,31 @@ delete images.
 import datetime
 import json
 from pathlib import Path
-from typing import Any
 
 import httpx
 import structlog
 
-from ..models.image import DATEFMT, Image
+from ..models.image import DATEFMT, Image, JSONImage
 from ..models.registry_category import RegistryCategory
+from .registry import ContainerRegistryClient
 
 LATEST_TAGS = ("latest", "latest_release", "latest_weekly", "latest_daily")
 
 
-class DockerHubClient(httpx.Client):
+class DockerHubClient(ContainerRegistryClient, httpx.Client):
     """Client for talking to docker.io / hub.docker.com."""
 
-    def __init__(self, namespace: str, repository: str) -> None:
+    def __init__(
+        self, namespace: str, repository: str, *, dry_run: bool = False
+    ) -> None:
         super().__init__()
         self.headers["content-type"] = "application/json"
         self._url = "https://hub.docker.com"
         self._namespace = namespace
         self._repository = repository
-        self._auth: str | None = None
         self._images: dict[str, Image] = {}
         self._logger = structlog.get_logger()
+        self._dry_run = dry_run
 
     def authenticate(self, username: str, password: str) -> None:
         url = f"{self._url}/v2/users/login"
@@ -52,9 +54,12 @@ class DockerHubClient(httpx.Client):
                 f"Requesting {self._namespace}/{self._repository}: images "
                 f"{count*page_size + 1}-{(count+1) * page_size}"
             )
+            if count > 0:
+                params["page"] = count + 1
             r = self.get(next_page, params=params)
             r.raise_for_status()
             obj = r.json()
+            next_page = obj["next"]
             results = obj["results"]
             for res in results:
                 tag = res["name"]
@@ -66,7 +71,6 @@ class DockerHubClient(httpx.Client):
                 for img in images:
                     digest = img["digest"]
                     self._upsert_image(digest, date, tag)
-            next_page = obj["next"]
             count += 1
         self._logger.debug(f"Found {len(list(self._images.keys()))} images")
 
@@ -77,27 +81,23 @@ class DockerHubClient(httpx.Client):
                 self._images[digest].tags = set()
             self._images[digest].tags.add(tag)
         else:
-            tags: set[str] | None = None
-            if tag:
-                tags = {tag}
+            tags = {tag} if tag else set()
             self._images[digest] = Image(digest=digest, tags=tags, date=dt)
 
-    def debug_dump_images(self, filename: str) -> None:
-        objs: dict[str, dict[str, str]] = {}
+    def debug_dump_images(self, outputfile: Path) -> None:
+        objs: dict[str, JSONImage] = {}
         for digest in self._images:
             img = self._images[digest]
             obj_img = img.to_dict()
             objs[digest] = obj_img
-        dd: dict[str, Any] = {
+        dd: dict[str, dict[str, str] | dict[str, JSONImage]] = {
             "metadata": {"category": RegistryCategory.DOCKERHUB.value},
             "data": objs,
         }
-        with Path.open(filename, "w") as f:
-            json.dump(dd, f, indent=2)
+        outputfile.write_text(json.dumps(dd, indent=2))
 
-    def debug_load_images(self, filename: str) -> None:
-        with Path.open(filename) as f:
-            inp = json.load(f)
+    def debug_load_images(self, inputfile: Path) -> None:
+        inp = json.loads(inputfile.read_text())
         if inp["metadata"]["category"] != RegistryCategory.DOCKERHUB.value:
             raise ValueError(
                 f"Dump is from {inp['metadata']['category']}, "
@@ -137,9 +137,12 @@ class DockerHubClient(httpx.Client):
         now = datetime.datetime.now(tz=datetime.UTC)
         now - datetime.timedelta(days=30)
         count = 0
+        dry = ""
+        if self._dry_run:
+            dry = " (not really)"
         for m in manifests:
             payload = {
-                "dry_run": False,
+                "dry_run": self._dry_run,
                 "manifests": [m],
             }
             r = self.post(
@@ -147,9 +150,9 @@ class DockerHubClient(httpx.Client):
                 json=payload,
             )
             r.raise_for_status()
-            self._logger.debug(f"Image {m['digest']} deleted")
+            self._logger.debug(f"Image {m['digest']} deleted{dry}")
             count += 1
-        self._logger.debug(f"Deleted {count} images")
+        self._logger.debug(f"Deleted {count} images{dry}")
 
     def deprecated_find_all(self) -> None:
         ### This API goes away Nov. 15, 2023.  Possibly December 11.
