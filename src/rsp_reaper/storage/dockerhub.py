@@ -7,56 +7,49 @@ delete images.
 import datetime
 import json
 from pathlib import Path
+from typing import cast
 
 import httpx
-import structlog
 
-from ..models.image import DATEFMT, Image, JSONImage
+from ..config import RegistryAuth, RegistryConfig
+from ..models.image import DATEFMT, LATEST_TAGS, Image, ImageSpec, JSONImage
 from ..models.registry_category import RegistryCategory
 from .registry import ContainerRegistryClient
 
-LATEST_TAGS = ("latest", "latest_release", "latest_weekly", "latest_daily")
 
-
-class DockerHubClient(ContainerRegistryClient, httpx.Client):
+class DockerHubClient(ContainerRegistryClient):
     """Client for talking to docker.io / hub.docker.com."""
 
-    def __init__(
-        self, namespace: str, repository: str, *, dry_run: bool = False
-    ) -> None:
-        super().__init__()
-        self.headers["content-type"] = "application/json"
+    def __init__(self, cfg: RegistryConfig) -> None:
+        super()._extract_registry_config(cfg)
+        self._http_client = httpx.Client()
+        self._http_client.headers["content-type"] = "application/json"
         self._url = "https://hub.docker.com"
-        self._namespace = namespace
-        self._repository = repository
-        self._images: dict[str, Image] = {}
-        self._logger = structlog.get_logger()
-        self._dry_run = dry_run
 
-    def authenticate(self, username: str, password: str) -> None:
+    def authenticate(self, i_auth: RegistryAuth) -> None:
         url = f"{self._url}/v2/users/login"
-        auth = {"username": username, "password": password}
-        r = self.post(url, json=auth)
+        auth = {"username": i_auth.username, "password": i_auth.password}
+        r = self._http_client.post(url, json=auth)
         r.raise_for_status()  # Maybe we'll do 2fa sometime?
-        self._logger.info(f"Authenticated user {username} to Docker Hub")
-        self.headers["authorization"] = f"Bearer {r.json()['token']}"
+        self._logger.info(f"Authenticated '{i_auth.username}' to Docker Hub")
+        self._http_client.headers["authorization"] = f"Bearer {r.json()['token']}"
 
     def scan_repo(self) -> None:
         next_page = (
-            f"{self._url}/v2/namespaces/{self._namespace}/repositories/"
-            f"{self._repository}/tags"
+            f"{self._url}/v2/namespaces/{self._owner}"
+            f"/repositories/{self._repository}/tags"
         )
         page_size = 100
         count = 0
         params = {"page_size": page_size}
         while next_page:
             self._logger.debug(
-                f"Requesting {self._namespace}/{self._repository}: images "
+                f"Requesting {self._owner}/{self._repository}: images "
                 f"{count*page_size + 1}-{(count+1) * page_size}"
             )
             if count > 0:
                 params["page"] = count + 1
-            r = self.get(next_page, params=params)
+            r = self._http_client.get(next_page, params=params)
             r.raise_for_status()
             obj = r.json()
             next_page = obj["next"]
@@ -106,15 +99,8 @@ class DockerHubClient(ContainerRegistryClient, httpx.Client):
         jsons = inp["data"]
         self._images = {}
         for digest in jsons:
-            tags = jsons[digest]["tags"]
-            date = jsons[digest]["date"]
-            self._images[digest] = Image(
-                digest=digest,
-                tags=set(tags),
-                date=datetime.datetime.strptime(date, DATEFMT).astimezone(
-                    datetime.UTC
-                ),
-            )
+            obj = cast(JSONImage, jsons[digest])
+            self._images[digest] = Image.from_json(obj)
 
     def _find_untagged(self) -> list[Image]:
         untagged: list[Image] = []
@@ -124,7 +110,7 @@ class DockerHubClient(ContainerRegistryClient, httpx.Client):
                 untagged.append(img)
         return untagged
 
-    def deprecated_delete_untagged(self) -> None:
+    def delete_untagged(self) -> None:
         """Delete all untagged images."""
         ### This API goes away Nov. 15, 2023.  Possibly December 11.
         #
@@ -145,8 +131,8 @@ class DockerHubClient(ContainerRegistryClient, httpx.Client):
                 "dry_run": self._dry_run,
                 "manifests": [m],
             }
-            r = self.post(
-                f"{self._url}/v2/namespaces/{self._namespace}/delete-images",
+            r = self._http_client.post(
+                f"{self._url}/v2/namespaces/{self._owner}/delete-images",
                 json=payload,
             )
             r.raise_for_status()
@@ -157,7 +143,7 @@ class DockerHubClient(ContainerRegistryClient, httpx.Client):
     def deprecated_find_all(self) -> None:
         ### This API goes away Nov. 15, 2023.  Possibly December 11.
         next_page = (
-            f"{self._url}/v2/namespaces/{self._namespace}"
+            f"{self._url}/v2/namespaces/{self._owner}"
             f"/repositories/{self._repository}/images"
         )
         page_size = 100
@@ -165,10 +151,10 @@ class DockerHubClient(ContainerRegistryClient, httpx.Client):
         count = 0
         while next_page:
             self._logger.debug(
-                f"Requesting {self._namespace}/{self._repository}: images "
+                f"Requesting {self._owner}/{self._repository}: images "
                 f"{count*page_size + 1}-{(count+1) * page_size}"
             )
-            r = self.get(next_page, params=params)
+            r = self._http_client.get(next_page, params=params)
             r.raise_for_status()
             obj = r.json()
             results = obj["results"]
@@ -189,3 +175,8 @@ class DockerHubClient(ContainerRegistryClient, httpx.Client):
             next_page = obj["next"]
             count += 1
         self._logger.debug(f"Found {len(list(self._images.keys()))} images")
+
+    def delete_images(self, inp: ImageSpec) -> None:
+        images = self._canonicalize_image_map(inp)
+        # Not implemented yet
+        _ = images

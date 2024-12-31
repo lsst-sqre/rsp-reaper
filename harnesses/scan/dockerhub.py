@@ -2,13 +2,23 @@
 
 import os
 
+from rsp_reaper.config import RegistryAuth, RegistryConfig, KeepPolicy
 from rsp_reaper.storage.dockerhub import DockerHubClient
 
 # We want to explode if the auth isn't set.
-username = os.environ["DOCKERHUB_USER"]
-password = os.environ["DOCKERHUB_PASSWORD"]
-c = DockerHubClient(
-    namespace="lsstsqre", repository="sciplat-lab", dry_run=True
+auth = RegistryAuth(
+    username=os.environ["DOCKERHUB_USER"],
+    password=os.environ["DOCKERHUB_PASSWORD"],
 )
-c.authenticate(username=username, password=password)
+cfg = RegistryConfig(
+    category="hub.docker.com",
+    registry="https://docker.io",
+    owner="lsstsqre",
+    repository="sciplat-lab",
+    keep=KeepPolicy(),
+    debug=True,
+    dry_run=True
+)
+c = DockerHubClient(cfg=cfg)
+c.authenticate(auth)
 c.scan_repo()

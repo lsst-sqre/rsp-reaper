@@ -16,8 +16,16 @@ from semver.version import VersionInfo
 DOCKER_DEFAULT_TAG = "latest"
 """Implicit tag used by Docker/Kubernetes when no tag is specified."""
 
+LATEST_TAGS = ("latest", "latest_release", "latest_weekly", "latest_daily")
+"""Conventional tags; aliases to more information-bearing tags."""
+
+ALIAS_TAGS = {"recommended"}
+ALIAS_TAGS.update({x for x in LATEST_TAGS})
+
 __all__ = [
+    "ALIAS_TAGS",
     "DOCKER_DEFAULT_TAG",
+    "LATEST_TAGS",
     "RSPImageTag",
     "RSPImageTagCollection",
     "RSPImageType",
@@ -197,13 +205,94 @@ class RSPImageTag:
         )
 
     def __eq__(self, other: object) -> bool:
-        return self._compare(other) == 0
+        return self.compare(other) == 0
 
     def __lt__(self, other: object) -> bool:
-        order = self._compare(other)
+        order = self.compare(other)
         if order is NotImplemented:
             return NotImplemented
         return order == -1
+
+    def compare(self, other: object, *, strict: bool = False) -> int:
+        """Compare to image tags for sorting purposes.
+
+        Parameters
+        ----------
+        other
+            The other object, potentially an image tag.
+        strict
+            Whether to be strict or lax about image comparison.  If
+        "strict" is set, any attempt to compare different image types
+        will return NotImplemented.  If it is not set (the default), images
+        of different types will be compared according to tag type priority.
+
+        Returns
+        -------
+        int or NotImplemented
+            0 if equal, -1 if self is less than other, 1 if self is greater
+            than other, `NotImplemented` if they're not comparable.
+
+        Notes
+        -----
+        In different contexts, either the strict behavior or the lax behavior
+        may be preferred.  For generating lists within a category (in order
+        to decide which images to purge), "strict" makes sense as a sanity
+        check so nothing will be deleted if you have different types within
+        your set of images.  However, for doing initial image categorization
+        and first-pass ordering, "lax" is a better idea.
+        """
+        if not isinstance(other, RSPImageTag):
+            return NotImplemented
+        if self.image_type != other.image_type:
+            if strict:
+                return NotImplemented
+            mypriority = self.tag_category_priority()
+            otherpriority = other.tag_category_priority()
+            if mypriority < otherpriority:
+                return 1
+        if not (self.version and other.version):
+            if self.tag == other.tag:
+                return 0
+            return -1 if self.tag < other.tag else 1
+        rank = self.version.compare(other.version)
+        if rank != 0:
+            return rank
+
+        # semver ignores the build for sorting purposes, but we don't want to
+        # since we want newer cycles to sort ahead of older cycles (and newer
+        # cycle builds to sort above older cycle builds) in otherwise matching
+        # tags, and the cycle information is stored in the build.
+        if self.version.build == other.version.build:
+            return 0
+        elif self.version.build:
+            if not other.version.build:
+                return 1
+            else:
+                return -1 if self.version.build < other.version.build else 1
+        else:
+            return -1 if other.version.build else 0
+
+    def tag_category_priority(self) -> int:
+        """Given a tag, return a number representing a rank; higher is better.
+
+        This lets us do the same total-sort-and-then-reverse thing we do to
+        identify images to keep.
+
+        Returns
+        -------
+        int
+            Tag priority rank.  Higher is better.
+        """
+        priority: dict[RSPImageType, int] = {}
+        for idx, entry in enumerate(RSPImageType):
+            if entry == RSPImageType.ALIAS:
+                continue
+            priority[entry] = len(RSPImageType) - idx
+        # Alias types are worse than UNKNOWN for this purpose (that is,
+        # they sort to the top of the spawner display, but they are
+        # useless for 'best tag' purposes
+        priority[RSPImageType.ALIAS] = 0
+        return priority[self.image_type]
 
     @classmethod
     def _from_match(
@@ -351,46 +440,6 @@ class RSPImageTag:
         else:
             return rest if rest else None
 
-    def _compare(self, other: object) -> int:
-        """Compare to image tags for sorting purposes.
-
-        Parameters
-        ----------
-        other
-            The other object, potentially an image tag.
-
-        Returns
-        -------
-        int or NotImplemented
-            0 if equal, -1 if self is less than other, 1 if self is greater
-            than other, `NotImplemented` if they're not comparable.
-        """
-        if not isinstance(other, RSPImageTag):
-            return NotImplemented
-        if self.image_type != other.image_type:
-            return NotImplemented
-        if not (self.version and other.version):
-            if self.tag == other.tag:
-                return 0
-            return -1 if self.tag < other.tag else 1
-        rank = self.version.compare(other.version)
-        if rank != 0:
-            return rank
-
-        # semver ignores the build for sorting purposes, but we don't want to
-        # since we want newer cycles to sort ahead of older cycles (and newer
-        # cycle builds to sort above older cycle builds) in otherwise matching
-        # tags, and the cycle information is stored in the build.
-        if self.version.build == other.version.build:
-            return 0
-        elif self.version.build:
-            if not other.version.build:
-                return 1
-            else:
-                return -1 if self.version.build < other.version.build else 1
-        else:
-            return -1 if other.version.build else 0
-
 
 class RSPImageTagCollection:
     """Hold and perform operations on a set of `RSPImageTag` objects.
@@ -468,6 +517,21 @@ class RSPImageTagCollection:
             The tag if found in the collection, else `None`.
         """
         return self._by_tag.get(tag_name)
+
+    def best_tag(self) -> RSPImageTag | None:
+        """Given the collection of tags, pick the highest priority one.
+
+        Alias tags are excluded from consideration in this case.
+        """
+        chosen: RSPImageTag | None = None
+        rank: int | None = None
+        for tag in self._by_tag:
+            rsptag = RSPImageTag.from_str(tag)
+            prio = rsptag.tag_category_priority()
+            if rank is None or rank > prio:
+                rank = prio
+                chosen = rsptag
+        return chosen
 
     def subset(
         self,

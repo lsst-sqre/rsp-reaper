@@ -3,51 +3,50 @@
 import datetime
 import json
 from pathlib import Path
+from typing import cast
 
-import structlog
 from google.cloud.artifactregistry_v1 import (
     ArtifactRegistryClient,
-    DeleteVersionRequest,
     ListDockerImagesRequest,
 )
 from google.cloud.artifactregistry_v1.types import DockerImage
 
-from ..models.image import DATEFMT, Image, JSONImage
+from ..config import RegistryAuth, RegistryConfig
+from ..models.image import Image, ImageSpec, JSONImage
 from ..models.registry_category import RegistryCategory
 from .registry import ContainerRegistryClient
 
 
 class GARClient(ContainerRegistryClient):
-    """Client for Google Artifact Registry.
+    """Client for Google Artifact Registry."""
 
-    We assume we can use application default credentials.  It should be run
-    using Workload Identity when it's run for real rather than for testing.
-    """
+    def __init__(self, cfg: RegistryConfig) -> None:
+        if cfg.category != RegistryCategory.GAR.value:
+            raise ValueError(
+                "GAR registry client must have value "
+                f"'{RegistryCategory.GAR.value}', not '{cfg.category}'"
+            )
+        self._category = cfg.category
+        super()._extract_registry_config(cfg)
+        gar_loc = "-docker.pkg.dev"
+        if not self._registry.endswith(gar_loc):
+            raise ValueError(
+                f"GAR registry location must end with '{gar_loc}'"
+            )
+        location = self._registry[len("https://") : -(len(gar_loc))]
 
-    def __init__(
-        self,
-        location: str,
-        project_id: str,
-        repository: str,
-        image: str,
-        *,
-        dry_run: bool = False,
-    ) -> None:
-        self._location = location
-        self._project_id = project_id
-        self._repository = repository
-        self._image = image
-        self._registry = f"{location}-docker.pkg.dev"
-        self._parent = (
-            f"projects/{project_id}/locations/{location}"
-            f"/repositories/{repository}"
+        self._parent: str = (
+            f"projects/{self._owner}/locations/{location}"
+            f"/repositories/{self._namespace}"
         )
-        # "path" is what everything else calls a repository
-        self._path = f"{project_id}/{repository}/{image}"
-        self._client = ArtifactRegistryClient()
-        self._logger = structlog.get_logger()
-        self._images: dict[str, Image] = {}
-        self._dry_run = dry_run
+        self._path: str = f"{self._owner}/{self._namespace}/{self._repository}"
+        self._client: ArtifactRegistryClient = ArtifactRegistryClient()
+
+    def authenticate(self, auth: RegistryAuth) -> None:
+        """In production, we will use Workload Identity.
+
+        For testing, we will use application default credentials.
+        """
 
     def scan_repo(self) -> None:
         images: list[DockerImage] = []
@@ -58,7 +57,8 @@ class GARClient(ContainerRegistryClient):
         count = 0
         while True:
             self._logger.debug(
-                f"Requesting {self._path}: images "
+                f"Requesting {self._owner}/{self._namespace}/"
+                f"{self._repository}: images "
                 f"{count*page_size + 1}-{(count+1) * page_size}"
             )
             resp = self._client.list_docker_images(request=request)
@@ -115,40 +115,19 @@ class GARClient(ContainerRegistryClient):
             )
         jsons = inp["data"]
         self._images = {}
+        count=0
         for digest in jsons:
-            tags = jsons[digest]["tags"]
-            date = jsons[digest]["date"]
-            self._images[digest] = Image(
-                digest=digest,
-                tags=set(tags),
-                date=datetime.datetime.strptime(date, DATEFMT).astimezone(
-                    datetime.UTC
-                ),
-            )
+            obj = cast(JSONImage, jsons[digest])
+            self._images[digest] = Image.from_json(obj)
+            count += 1
+        self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
 
     def _image_to_name(self, img: Image) -> str:
-        return f"{self._parent}/packages/{self._image}/versions/{img.digest}"
+        return (
+            f"{self._parent}/packages/{self._repository}/versions/{img.digest}"
+        )
 
-    def _find_untagged(self) -> list[Image]:
-        return [x for x in self._images.values() if not x.tags]
-
-    def delete_untagged(self) -> None:
-        """Delete all untagged images."""
-        untagged = self._find_untagged()
-        count = 0
-        dry = ""
-        if self._dry_run:
-            dry = " (not really)"
-        for u in untagged:
-            digest = u.digest
-            request = DeleteVersionRequest(name=self._image_to_name(u))
-            self._logger.debug(f"Deletion request: {request}")
-            if not self._dry_run:
-                # Don't understand what's wrong with the next line
-                operation = self._client.delete_version(request=request)
-                self._logger.debug(
-                    f"Waiting for deletion of {self._path}@{digest} to finish"
-                )
-                operation.result()
-            count += 1
-        self._logger.debug(f"Deleted {count} images{dry}")
+    def delete_images(self, inp: ImageSpec) -> None:
+        images = self._canonicalize_image_map(inp)
+        # Not implemented yet
+        _ = images

@@ -2,10 +2,19 @@
 
 import os
 
+from rsp_reaper.config import RegistryAuth, RegistryConfig, KeepPolicy
 from rsp_reaper.storage.ghcr import GhcrClient
 
 # We want to explode if the token isn't set.
-token = os.environ["GHCR_TOKEN"]
-c = GhcrClient(namespace="lsst-sqre", repository="sciplat-lab", dry_run=True)
-c.authenticate(token=token)
+auth = RegistryAuth(password=os.environ["GHCR_TOKEN"])
+cfg=RegistryConfig(
+        category="ghcr.io",
+        registry="https://ghcr.io",
+        owner="lsst-sqre",
+        repository="sciplat-lab",
+        keep=KeepPolicy(),
+        dry_run=True
+    )
+c = GhcrClient(cfg=cfg)
+c.authenticate(auth)
 c.scan_repo()

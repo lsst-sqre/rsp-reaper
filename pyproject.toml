@@ -118,8 +118,14 @@ python_files = [
 extend = "ruff-shared.toml"
 
 [tool.ruff.lint.per-file-ignores]
-"src/jupyterlabcontroller/services/**" = [
-    "S108",    # constructing /tmp paths for Kubernetes Pods
+"src/rsp_reaper/models/rsptag.py" = [
+    "C901",    # yes, compare() does have a lot of cases
+]
+
+"tests/**.py" = [
+    "SLF001",  # Tests are allowed to access private members
+    "T201",    # Tests are allowed to print
+    "S101",    # Tests can use assert
 ]
 
 [tool.ruff.lint.isort]

@@ -3,43 +3,38 @@
 import datetime
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
-import structlog
 
-from ..models.image import DATEFMT, Image, JSONImage
+from ..config import RegistryAuth, RegistryConfig
+from ..models.image import DATEFMT, Image, ImageSpec, JSONImage
 from ..models.registry_category import RegistryCategory
 from .registry import ContainerRegistryClient
 
 
-class GhcrClient(ContainerRegistryClient, httpx.Client):
+class GhcrClient(ContainerRegistryClient):
     """Storage client for communication with ghcr.io."""
 
-    def __init__(
-        self, namespace: str, repository: str, *, dry_run: bool = False
-    ) -> None:
-        super().__init__()
-        self.headers.update(
+    def __init__(self, cfg: RegistryConfig) -> None:
+        super()._extract_registry_config(cfg)
+        self._http_client = httpx.Client()
+        self._http_client.headers.update(
             {
                 "content-type": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
             }
         )
         self._url = "https://api.github.com"
-        self._namespace = namespace
-        self._repository = repository
-        self._image_by_digest: dict[str, Image] = {}
         self._image_by_id: dict[str, Image] = {}
-        self._logger = structlog.get_logger()
-        self._dry_run = dry_run
 
-    def authenticate(self, token: str) -> None:
-        self.headers["authorization"] = f"Bearer {token}"
+    def authenticate(self, auth: RegistryAuth) -> None:
+        """Use the 'password' field as the token.  Other fields ignored."""
+        self._http_client.headers["authorization"] = f"Bearer {auth.password}"
 
     def scan_repo(self) -> None:
         url = (
-            f"{self._url}/orgs/{self._namespace}/packages"
+            f"{self._url}/orgs/{self._owner}/packages"
             f"/container/{self._repository}/versions"
         )
         page_size = 100
@@ -48,11 +43,11 @@ class GhcrClient(ContainerRegistryClient, httpx.Client):
         results: list[dict[str, Any]] = []
         while True:
             self._logger.debug(
-                f"Requesting {self._namespace}/{self._repository}: images "
+                f"Requesting {self._owner}/{self._repository}: images "
                 f"{(page -1) *page_size + 1}-{page * page_size}"
             )
             params["page"] = page
-            r = self.get(url, params=params)
+            r = self._http_client.get(url, params=params)
             r.raise_for_status()
             imgs = r.json()
             if len(imgs) == 0:
@@ -68,7 +63,7 @@ class GhcrClient(ContainerRegistryClient, httpx.Client):
                 f"{i['updated_at'][:-1]}.000000Z", DATEFMT
             ).astimezone(tz=datetime.UTC)
             img = Image(digest=digest, tags=tags, date=date, id=id)
-            self._image_by_digest[digest] = img
+            self._images[digest] = img
             self._image_by_id[id] = img
         self._logger.debug(
             f"Found {len(list(self._image_by_id.keys()))} images"
@@ -76,8 +71,8 @@ class GhcrClient(ContainerRegistryClient, httpx.Client):
 
     def debug_dump_images(self, outputfile: Path) -> None:
         objs: dict[str, JSONImage] = {}
-        for digest in self._image_by_digest:
-            img = self._image_by_digest[digest]
+        for digest in self._images:
+            img = self._images[digest]
             obj_img = img.to_dict()
             objs[digest] = obj_img
         dd: dict[str, dict[str, str] | dict[str, JSONImage]] = {
@@ -94,27 +89,19 @@ class GhcrClient(ContainerRegistryClient, httpx.Client):
                 f"not {RegistryCategory.GHCR.value}"
             )
         jsons = inp["data"]
-        self._image_by_digest = {}
+        self._images = {}
         self._image_by_id = {}
         for digest in jsons:
-            tags = jsons[digest]["image"]["tags"]
-            date = jsons[digest]["image"]["date"]
             id = jsons[digest]["id"]
-            img = Image(
-                digest=digest,
-                tags=set(tags),
-                date=datetime.datetime.strptime(date, DATEFMT).astimezone(
-                    datetime.UTC
-                ),
-                id=id,
-            )
-            self._image_by_digest[digest] = img
+            obj = cast(JSONImage, jsons[digest])
+            img = Image.from_json(obj)
+            self._images[digest] = img
             self._image_by_id[id] = img
 
     def _find_untagged(self) -> list[Image]:
         ret: list[Image] = []
-        for dig in self._image_by_digest:
-            g_img = self._image_by_digest[dig]
+        for dig in self._images:
+            g_img = self._images[dig]
             if not g_img.tags:
                 ret.append(g_img)
         return ret
@@ -128,12 +115,17 @@ class GhcrClient(ContainerRegistryClient, httpx.Client):
             dry = " (not really)"
         for u in untagged:
             url = (
-                f"{self._url}/orgs/{self._namespace}/packages"
+                f"{self._url}/orgs/{self._owner}/packages"
                 f"/container/{self._repository}/versions/{u.id}"
             )
             if not self._dry_run:
-                r = self.delete(url)
+                r = self._http_client.delete(url)
                 r.raise_for_status()
             self._logger.debug(f"Image {u.digest} deleted{dry}")
             count += 1
         self._logger.debug(f"Deleted {count} images{dry}")
+
+    def delete_images(self, inp: ImageSpec) -> None:
+        images = self._canonicalize_image_map(inp)
+        # Not implemented yet
+        _ = images

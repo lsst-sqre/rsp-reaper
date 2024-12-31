@@ -1,7 +1,11 @@
 """Interactive harness for Google Artifact Registry."""
-
+from pathlib import Path
 from rsp_reaper.config import KeepPolicy, RegistryConfig
+from rsp_reaper.models.image import ImageVersionClass
 from rsp_reaper.storage.gar import GARClient
+
+input_file = ( Path(__file__).parent.parent.parent / "tests" / "support" /
+               "gar.contents.json")
 
 cfg = RegistryConfig(
     category="pkg.dev",
@@ -9,10 +13,14 @@ cfg = RegistryConfig(
     owner="rubin-shared-services-71ec",
     namespace="sciplat",
     repository="sciplat-lab",
-    keep = KeepPolicy(),    
     dry_run=True,
     debug=True,
+    input_file=input_file,
+    keep = KeepPolicy()
 )
+
 c = GARClient(cfg=cfg)
-# No authentication; set up application default credentials in the environment
-c.scan_repo()
+c.categorize(ImageVersionClass.RSP)
+
+
+

@@ -9,7 +9,7 @@ from typing import Self
 import structlog
 from structlog.stdlib import BoundLogger
 
-from .config import ContainerRegistryConfig
+from .config import RegistryConfig
 
 
 class Factory:
@@ -17,7 +17,7 @@ class Factory:
 
     Parameters
     ----------
-    config: ContainerRegistryConfig
+    config: RegistryConfig
         Reaper configuration.
 
     logger
@@ -26,9 +26,7 @@ class Factory:
 
     @classmethod
     @asynccontextmanager
-    async def standalone(
-        cls, config: ContainerRegistryConfig
-    ) -> AsyncIterator[Self]:
+    async def standalone(cls, config: RegistryConfig) -> AsyncIterator[Self]:
         """Async context manager for reaper components.
 
         Intended for the test suite.
@@ -36,7 +34,7 @@ class Factory:
         Parameters
         ----------
         config
-            Container Registry configuration
+            Registry configuration
 
         Yields
         ------
