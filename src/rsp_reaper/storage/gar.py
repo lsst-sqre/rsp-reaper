@@ -115,7 +115,7 @@ class GARClient(ContainerRegistryClient):
             )
         jsons = inp["data"]
         self._images = {}
-        count=0
+        count = 0
         for digest in jsons:
             obj = cast(JSONImage, jsons[digest])
             self._images[digest] = Image.from_json(obj)

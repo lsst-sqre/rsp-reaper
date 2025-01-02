@@ -9,7 +9,7 @@ cfg = RegistryConfig(
     owner="rubin-shared-services-71ec",
     namespace="sciplat",
     repository="sciplat-lab",
-    keep = KeepPolicy(),    
+    keep=KeepPolicy(),
     dry_run=True,
     debug=True,
 )

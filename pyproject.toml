@@ -121,6 +121,10 @@ extend = "ruff-shared.toml"
 "src/rsp_reaper/models/rsptag.py" = [
     "C901",    # yes, compare() does have a lot of cases
 ]
+"src/rsp_reaper/services/reaper.py" = [
+    "C901",    # yes, RSP retention is complicated
+    "PLR0912", # yes, RSP retention is complicated
+]
 
 "tests/**.py" = [
     "SLF001",  # Tests are allowed to access private members

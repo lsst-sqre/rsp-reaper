@@ -20,7 +20,7 @@ LATEST_TAGS = ("latest", "latest_release", "latest_weekly", "latest_daily")
 """Conventional tags; aliases to more information-bearing tags."""
 
 ALIAS_TAGS = {"recommended"}
-ALIAS_TAGS.update({x for x in LATEST_TAGS})
+ALIAS_TAGS.update(set(LATEST_TAGS))
 
 __all__ = [
     "ALIAS_TAGS",

@@ -5,12 +5,9 @@
 # After editing, update requirements/main.txt by running:
 #     make update-deps
 
-# This is most of it: contains the repository scanning tools
-# That doesn't have delete methods; someday we should put it in Safir, but
-# for now we'll just roll our own.
-# git+https://github.com/lsst-sqre/jupyterlab-controller
 google-cloud-artifact-registry
 httpx
+pytimeparse
 semver
 structlog
 

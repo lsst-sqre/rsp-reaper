@@ -8,30 +8,48 @@ from pathlib import Path
 class RegistryAuth:
     """Generic authentication item for a container registry."""
 
-    realm: str|None = None
-    username: str|None = None
-    password: str|None = None
+    realm: str | None = None
+    username: str | None = None
+    password: str | None = None
+
+
+@dataclass
+class IndividualKeepPolicy:
+    """The policy has both a 'number' and an 'age' field.  'number'
+    means keep that many of whatever image class this is attached to.
+    `-1` or `None` means "do not reap that class at all". and `0`
+    means "purge them all".  'age' means keep anything that is the
+    specified duration or less.  Durations are strings as accepted by
+    https://github.com/wroberts/pytimeparse and once again `None` or
+    the empty string means "do not reap that class at all".
+
+    You should specify only one of these.  If both are specified, 'number'
+    will win.
+    """
+
+    age: str | None = None
+    number: int | None = None
 
 
 class LatestSemverKeepers:
-    """Number of items to keep for latest major semver release.  Default is
-    "do not purge".
+    """How to choose items to keep for latest major semver release.
+    Default is "do not purge".
     """
 
-    minor: int | None = None
-    patch: int | None = None
-    build: int | None = None
+    minor: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    patch: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    build: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
 
 
 class OlderSemverKeepers:
-    """Number of items to keep for previous major semver releases.  Default is
-    "do not purge".
+    """How to choose items to keep for previous major semver releases.
+    Default is "do not purge".
     """
 
-    major: int | None = None
-    minor: int | None = None
-    patch: int | None = None
-    build: int | None = None
+    major: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    minor: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    patch: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    build: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
 
 
 @dataclass
@@ -55,22 +73,27 @@ class RSPKeepers:
     purge".
     """
 
-    release: int | None = None
-    weekly: int | None = None
-    daily: int | None = None
-    release_candidate: int | None = None
-    experimental: int | None = None
-    unknown: int | None = None
+    release: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    weekly: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    daily: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
+    release_candidate: IndividualKeepPolicy = field(
+        default_factory=IndividualKeepPolicy
+    )
+    experimental: IndividualKeepPolicy = field(
+        default_factory=IndividualKeepPolicy
+    )
+    unknown: IndividualKeepPolicy = field(default_factory=IndividualKeepPolicy)
 
 
 @dataclass
 class KeepPolicy:
-    """How many of each image category to keep.  `-1` or `None` means
-    "don't reap that category at all".  `0` means "purge them all".
+    """How to choose which images within each image category to keep.
     The default is to purge nothing.
     """
 
-    untagged: int | None = None
+    untagged: IndividualKeepPolicy = field(
+        default_factory=IndividualKeepPolicy
+    )
     semver: SemverKeepers | None = field(default_factory=SemverKeepers)
     rsp: RSPKeepers | None = field(default_factory=RSPKeepers)
 
@@ -84,6 +107,7 @@ class RegistryConfig:
     repository: str  # Repository name, e.g. "sciplat-lab"
     category: str
     keep: KeepPolicy
+    image_version_class: str = "rsp"
     namespace: str | None = None  # Intermediate layer if any; GAR: "sciplat"
     auth: RegistryAuth | None = None
     dry_run: bool = True

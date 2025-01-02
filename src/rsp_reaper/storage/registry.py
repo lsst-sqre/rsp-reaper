@@ -12,7 +12,10 @@ from ..config import RegistryAuth, RegistryConfig
 from ..models.image import Image, ImageCollection, ImageSpec, ImageVersionClass
 from ..models.registry_category import RegistryCategory
 from ..models.rsptag import (
-    ALIAS_TAGS, RSPImageTag, RSPImageTagCollection, RSPImageType
+    ALIAS_TAGS,
+    RSPImageTag,
+    RSPImageTagCollection,
+    RSPImageType,
 )
 
 
@@ -59,9 +62,9 @@ class ContainerRegistryClient:
         ...
 
     def __init__(self, cfg: RegistryConfig) -> None:
-        # Only here to get instance fields referenced in non-abstract methods.
-        # Generally, redefine these in child classes, because multiple
-        # inheritance makes running super().__init__() ugly.
+        # Because multiple inheritance makes running super().__init__() ugly,
+        # we do the work in a method that is not likely to exist on a different
+        # class.
         self._extract_registry_config(cfg)
 
     def _find_untagged_images(self) -> dict[str, Image]:
@@ -89,6 +92,28 @@ class ContainerRegistryClient:
         self._repository = cfg.repository
         self._namespace = cfg.namespace
 
+        # Validate image class
+        vclasses = [x.value.lower() for x in ImageVersionClass]
+        if cfg.image_version_class not in vclasses:
+            raise ValueError(
+                f"Image version class '{cfg.image_version_class}' not in"
+                f"{vclasses}"
+            )
+        match cfg.image_version_class:
+            case "rsp":
+                self._image_version_class = ImageVersionClass.RSP
+            case "semver":
+                self._image_version_class = ImageVersionClass.SEMVER
+            case "untagged":
+                # Why would you do this?
+                self._image_version_class = ImageVersionClass.UNTAGGED
+                self._logger.warning("image_version_class is 'untagged'")
+            case _:
+                raise NotImplementedError(
+                    f"image_version_class '{cfg.image_version_class}' not "
+                    "yet implemented"
+                )
+
         # Validate category
         categories = [x.value for x in RegistryCategory]
         if cfg.category not in categories:
@@ -98,20 +123,19 @@ class ContainerRegistryClient:
         # Initialize empty image map
         self._images: dict[str, Image] = {}
         # Initialize empty categorized image map
-        self._categorized_images = ImageCollection()
+        self.categorized_images = ImageCollection()
 
         # Load inputs if supplied
         if cfg.input_file:
             self.debug_load_images(cfg.input_file)
 
-    def categorize(self, image_version_class: ImageVersionClass) -> None:
+    def categorize(self) -> None:
         """Run images through the tag interpreter; categorize and sort them."""
-        if image_version_class == ImageVersionClass.RSP:
+        if self._image_version_class == ImageVersionClass.RSP:
             self._categorize_rsp()
-        elif image_version_class == ImageVersionClass.SEMVER:
+        elif self._image_version_class == ImageVersionClass.SEMVER:
             self._categorize_semver()
         self._categorize_untagged()
-        self._image_version_class = image_version_class
 
     def _categorize_rsp(self) -> None:
         unsorted: list[Image] = list(self._images.values())
@@ -131,7 +155,7 @@ class ContainerRegistryClient:
         # categorize each image by type
         for typ in RSPImageType:
             key = typ.value.lower().replace(" ", "_")
-            self._categorized_images.rsp[key] = {
+            self.categorized_images.rsp[key] = {
                 x.digest: x
                 for x in unsorted
                 if x.rsp_image_tag is not None
@@ -141,9 +165,9 @@ class ContainerRegistryClient:
         # now sort within each type
         for typ in RSPImageType:
             key = typ.value.lower().replace(" ", "_")
-            unsorted = list(self._categorized_images.rsp[key].values())
+            unsorted = list(self.categorized_images.rsp[key].values())
             sorted_img = sorted(unsorted, reverse=True)
-            self._categorized_images.rsp[key] = {
+            self.categorized_images.rsp[key] = {
                 x.digest: x for x in sorted_img
             }
 
@@ -163,11 +187,11 @@ class ContainerRegistryClient:
             else:
                 img.semver_tag = semver.Version.parse(f"0.0.0-{img.digest}")
         sorted_img = sorted(unsorted, reverse=True)
-        self._categorized_images.semver = {x.digest: x for x in sorted_img}
+        self.categorized_images.semver = {x.digest: x for x in sorted_img}
 
     def _categorize_untagged(self) -> None:
         untagged = self._find_untagged_images()
-        self._categorized_images.untagged = {
+        self.categorized_images.untagged = {
             x.digest: x for x in sorted(list(untagged.values()), reverse=True)
         }
 

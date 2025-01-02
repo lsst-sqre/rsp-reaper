@@ -21,6 +21,11 @@ class DockerHubClient(ContainerRegistryClient):
     """Client for talking to docker.io / hub.docker.com."""
 
     def __init__(self, cfg: RegistryConfig) -> None:
+        if cfg.category != RegistryCategory.DOCKERHUB.value:
+            raise ValueError(
+                "DockerHub registry client must have value "
+                f"'{RegistryCategory.DOCKERHUB.value}', not '{cfg.category}'"
+            )
         super()._extract_registry_config(cfg)
         self._http_client = httpx.Client()
         self._http_client.headers["content-type"] = "application/json"
@@ -32,7 +37,9 @@ class DockerHubClient(ContainerRegistryClient):
         r = self._http_client.post(url, json=auth)
         r.raise_for_status()  # Maybe we'll do 2fa sometime?
         self._logger.info(f"Authenticated '{i_auth.username}' to Docker Hub")
-        self._http_client.headers["authorization"] = f"Bearer {r.json()['token']}"
+        self._http_client.headers["authorization"] = (
+            f"Bearer {r.json()['token']}"
+        )
 
     def scan_repo(self) -> None:
         next_page = (

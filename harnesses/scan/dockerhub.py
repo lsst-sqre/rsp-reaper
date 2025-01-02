@@ -2,7 +2,7 @@
 
 import os
 
-from rsp_reaper.config import RegistryAuth, RegistryConfig, KeepPolicy
+from rsp_reaper.config import KeepPolicy, RegistryAuth, RegistryConfig
 from rsp_reaper.storage.dockerhub import DockerHubClient
 
 # We want to explode if the auth isn't set.
@@ -17,7 +17,7 @@ cfg = RegistryConfig(
     repository="sciplat-lab",
     keep=KeepPolicy(),
     debug=True,
-    dry_run=True
+    dry_run=True,
 )
 c = DockerHubClient(cfg=cfg)
 c.authenticate(auth)
