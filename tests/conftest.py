@@ -11,10 +11,10 @@ from rsp_reaper.storage.ghcr import GhcrClient
 
 
 @pytest.fixture
-def gar_client() -> GARClient:
-    """Client for Google Artifact Registry."""
+def gar_cfg() -> RegistryConfig:
+    """Config for Google Artifact Registry."""
     input_file = Path(__file__).parent / "support" / "gar.contents.json"
-    cfg = RegistryConfig(
+    return RegistryConfig(
         category="pkg.dev",
         registry="https://us-central1-docker.pkg.dev",
         owner="rubin-shared-services-71ec",
@@ -26,13 +26,19 @@ def gar_client() -> GARClient:
         debug=True,
         input_file=input_file,
     )
-    return GARClient(cfg=cfg)
 
 
-def ghcr_client() -> GhcrClient:
-    """Client for GitHub Container Registry."""
+@pytest.fixture
+def gar_client(gar_cfg: RegistryConfig) -> GARClient:
+    """Client for Google Artifact Registry."""
+    return GARClient(cfg=gar_cfg)
+
+
+@pytest.fixture
+def ghcr_cfg() -> RegistryConfig:
+    """Config for GitHub Container Registry."""
     input_file = Path(__file__).parent / "support" / "ghcr.io.contents.json"
-    cfg = RegistryConfig(
+    return RegistryConfig(
         category="ghcr.io",
         registry="https://ghcr.io",
         owner="lsst-sqre",
@@ -43,13 +49,19 @@ def ghcr_client() -> GhcrClient:
         debug=True,
         input_file=input_file,
     )
-    return GhcrClient(cfg=cfg)
 
 
-def dockerhub_client() -> DockerHubClient:
-    """Client for Docker Hub."""
+@pytest.fixture
+def ghcr_client(ghcr_cfg: RegistryConfig) -> GhcrClient:
+    """Client for GitHub Container Registry."""
+    return GhcrClient(cfg=ghcr_cfg)
+
+
+@pytest.fixture
+def dockerhub_cfg() -> RegistryConfig:
+    """Config for DockerHub."""
     input_file = Path(__file__).parent / "support" / "docker.io.contents.json"
-    cfg = RegistryConfig(
+    return RegistryConfig(
         category="hub.docker.com",
         registry="https://docker.io",
         owner="lsstsqre",
@@ -60,4 +72,9 @@ def dockerhub_client() -> DockerHubClient:
         debug=True,
         input_file=input_file,
     )
-    return DockerHubClient(cfg=cfg)
+
+
+@pytest.fixture
+def dockerhub_client(dockerhub_cfg: RegistryConfig) -> DockerHubClient:
+    """Client for Docker Hub."""
+    return DockerHubClient(cfg=dockerhub_cfg)

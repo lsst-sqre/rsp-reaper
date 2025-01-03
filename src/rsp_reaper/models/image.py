@@ -9,7 +9,12 @@ from typing import Self, cast
 
 import semver
 
-from .rsptag import RSPImageTag, RSPImageTagCollection, RSPImageType
+from .rsptag import (
+    RSP_TYPENAMES,
+    RSPImageTag,
+    RSPImageTagCollection,
+    RSPImageType,
+)
 
 DATEFMT = "%Y-%m-%dT%H:%M:%S.%f%z"
 LATEST_TAGS = ("latest", "latest_release", "latest_weekly", "latest_daily")
@@ -252,8 +257,9 @@ class Image:
 
 def _gen_rsp_coll() -> dict[str, dict[str, Image]]:
     retval: dict[str, dict[str, Image]] = {}
-    for typ in RSPImageType:
-        retval[typ.value.lower().replace(" ", "_")] = {}
+    for typ in RSP_TYPENAMES:
+        empty: dict[str, Image] = {}
+        retval[typ] = empty
     return retval
 
 
@@ -267,3 +273,11 @@ class ImageCollection:
     untagged: dict[str, Image] = field(default_factory=dict)
     semver: dict[str, Image] = field(default_factory=dict)
     rsp: dict[str, dict[str, Image]] = field(default_factory=_gen_rsp_coll)
+
+    def image_counts(self) -> dict[str, int]:
+        retval: dict[str, int] = {}
+        retval["untagged"] = len(self.untagged)
+        retval["semver"] = len(self.semver)
+        for typ in RSP_TYPENAMES:
+            retval[f"rsp_{typ}"] = len(self.rsp[typ])
+        return retval

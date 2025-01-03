@@ -13,6 +13,7 @@ from ..models.image import Image, ImageCollection, ImageSpec, ImageVersionClass
 from ..models.registry_category import RegistryCategory
 from ..models.rsptag import (
     ALIAS_TAGS,
+    RSP_TYPENAMES,
     RSPImageTag,
     RSPImageTagCollection,
     RSPImageType,
@@ -137,13 +138,19 @@ class ContainerRegistryClient:
             self._categorize_semver()
         self._categorize_untagged()
 
-    def _categorize_rsp(self) -> None:
+    def _categorize_rsp(self, aliases: set[str] = ALIAS_TAGS) -> None:
         unsorted: list[Image] = list(self._images.values())
         # Add a single RSP tag to each image
+        unsorted_tagged: list[Image] = []
         for img in unsorted:
+            if not img.tags:
+                # If the image has no tags, skip it.  It will be picked up
+                # when we categorize the untagged images
+                continue
+            unsorted_tagged.append(img)
             raw_tags = list(img.tags)
             collection = RSPImageTagCollection.from_tag_names(
-                raw_tags, aliases=ALIAS_TAGS, cycle=None
+                raw_tags, aliases=aliases, cycle=None
             )
             rsp_image_tag = collection.best_tag()
             if rsp_image_tag is None:
@@ -152,24 +159,42 @@ class ContainerRegistryClient:
                 rsp_image_tag = RSPImageTag.from_str(t_tag)
             img.rsp_image_tag = rsp_image_tag
 
-        # categorize each image by type
-        for typ in RSPImageType:
-            key = typ.value.lower().replace(" ", "_")
-            self.categorized_images.rsp[key] = {
-                x.digest: x
-                for x in unsorted
-                if x.rsp_image_tag is not None
-                and x.rsp_image_tag.image_type == typ
-                and x.tags
-            }
-        # now sort within each type
-        for typ in RSPImageType:
-            key = typ.value.lower().replace(" ", "_")
-            unsorted = list(self.categorized_images.rsp[key].values())
-            sorted_img = sorted(unsorted, reverse=True)
-            self.categorized_images.rsp[key] = {
-                x.digest: x for x in sorted_img
-            }
+        categorized_unsorted = self._categorize_unsorted_rsp_images(
+            unsorted_tagged
+        )
+
+        self.categorized_images.rsp = self._sort_categorized_rsp_images(
+            categorized_unsorted
+        )
+
+    def _categorize_unsorted_rsp_images(
+        self, unsorted: list[Image]
+    ) -> dict[str, dict[str, Image]]:
+        retval: dict[str, dict[str, Image]] = {}
+        for category in RSP_TYPENAMES:
+            retval[category] = {}
+        for img in unsorted:
+            for typ in RSPImageType:
+                if (
+                    img
+                    and img.rsp_image_tag is not None
+                    and img.rsp_image_tag.image_type == typ
+                ):
+                    key = typ.value.lower().replace(" ", "_")
+                    retval[key][img.digest] = img
+                    break
+        return retval
+
+    def _sort_categorized_rsp_images(
+        self, categorized: dict[str, dict[str, Image]]
+    ) -> dict[str, dict[str, Image]]:
+        retval: dict[str, dict[str, Image]] = {}
+        for key, imgs in categorized.items():
+            # Sort the images and then insert them into a new dict.
+            # Dicts now preserve insertion order.
+            sorted_vals = sorted(imgs.values(), reverse=True)
+            retval[key] = {x.digest: x for x in sorted_vals}
+        return retval
 
     def _categorize_semver(self) -> None:
         unsorted = [x for x in list(self._images.values()) if x is not None]

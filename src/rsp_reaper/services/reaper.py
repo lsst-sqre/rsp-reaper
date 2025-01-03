@@ -3,13 +3,15 @@
 import datetime
 import logging
 import os
+from copy import deepcopy
 
-import durations
+import pytimeparse
 import structlog
 
 from ..config import RegistryAuth, RegistryConfig
-from ..models.image import Image, ImageVersionClass
+from ..models.image import Image, ImageCollection, ImageVersionClass
 from ..models.registry_category import RegistryCategory
+from ..models.rsptag import RSP_TYPENAMES
 from ..storage.dockerhub import DockerHubClient
 from ..storage.gar import GARClient
 from ..storage.ghcr import GhcrClient
@@ -95,14 +97,10 @@ class Reaper:
         kp = self._keep_policy.rsp
         if kp is None:
             return self._plan_untagged()
-        for img_type in (
-            "release",
-            "weekly",
-            "daily",
-            "release_candidate",
-            "experimental",
-            "unknown",
-        ):
+        for img_type in RSP_TYPENAMES:
+            if img_type == "alias":
+                # Alias should never be a resolved type.
+                continue
             imgs = self._categorized.rsp[img_type]
             match img_type:
                 case "release":
@@ -124,7 +122,7 @@ class Reaper:
 
             if pol.number is None:
                 if pol.age is not None:
-                    seconds = durations.parse(pol.age)
+                    seconds = pytimeparse.parse(pol.age)
                     if seconds is not None:
                         retval.update(
                             self._plan_age(seconds=seconds, imgs=imgs)
@@ -140,7 +138,7 @@ class Reaper:
         if self._keep_policy.untagged.number is None:
             if self._keep_policy.untagged.age is None:
                 return {}
-            seconds = durations.parse(self._keep_policy.untagged.age)
+            seconds = pytimeparse.parse(self._keep_policy.untagged.age)
             if seconds is None:
                 return {}
             return self._plan_age(
@@ -160,24 +158,12 @@ class Reaper:
         now = datetime.datetime.now(tz=datetime.UTC)
         age = datetime.timedelta(seconds=seconds)
         cutoff = now - age
-
-        for dig in imgs:
-            img = self._categorized.untagged[dig]
+        for dig, img in imgs.items():
             if img.date is None:
                 self._logger.warning(f"Image '{dig}' has no date")
                 continue
             if img.date < cutoff:
-                self._logger.debug(
-                    f"Selecting image '{dig}' for reaping: "
-                    f"{img.date.isoformat()} is older than cutoff "
-                    f"{cutoff.isoformat()}"
-                )
                 retval[dig] = img
-            else:
-                self._logger.debug(
-                    f"Image '{dig}' has date {img.date.isoformat()}, "
-                    f"which is newer than cutoff {cutoff.isoformat()}"
-                )
         return retval
 
     def _plan_number(
@@ -185,3 +171,24 @@ class Reaper:
     ) -> dict[str, Image]:
         # Categorized images are already sorted
         return {x.digest: x for x in list(imgs.values())[keep_count:]}
+
+    def remaining(self, victims: dict[str, Image]) -> ImageCollection:
+        """Return an ImageCollection containing those images which
+        would remain after the results of a plan were removed during that
+        plan's execution.
+        """
+        retval = deepcopy(self._categorized)
+        for dig in victims:
+            for category in ("untagged", "semver"):
+                immut = getattr(self._categorized, category)
+                mut = getattr(retval, category)
+                for img in immut:
+                    if dig == img:
+                        del mut[dig]
+            immut = self._categorized.rsp
+            mut = retval.rsp
+            for nam in RSP_TYPENAMES:
+                for img in immut[nam]:
+                    if dig == img:
+                        del mut[nam][dig]
+        return retval

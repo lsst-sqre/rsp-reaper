@@ -26,6 +26,7 @@ __all__ = [
     "ALIAS_TAGS",
     "DOCKER_DEFAULT_TAG",
     "LATEST_TAGS",
+    "RSP_TYPENAMES",
     "RSPImageTag",
     "RSPImageTagCollection",
     "RSPImageType",
@@ -47,6 +48,8 @@ class RSPImageType(Enum):
     EXPERIMENTAL = "Experimental"
     UNKNOWN = "Unknown"
 
+
+RSP_TYPENAMES = [x.value.lower().replace(" ", "_") for x in RSPImageType]
 
 # Regular expression components used to construct the parsing regexes.
 
@@ -170,7 +173,7 @@ class RSPImageTag:
         )
 
     @classmethod
-    def from_str(cls, tag: str) -> Self:
+    def from_str(cls, tag: str, aliases: set[str] = ALIAS_TAGS) -> Self:
         """Parse a tag into an `RSPImageTag`.
 
         Parameters
@@ -185,6 +188,8 @@ class RSPImageTag:
         """
         if not tag:
             tag = DOCKER_DEFAULT_TAG
+        if tag in aliases:
+            return cls.alias(tag)
         for image_type, regex in _TAG_REGEXES:
             match = regex.match(tag)
             if match:
@@ -203,6 +208,28 @@ class RSPImageTag:
             cycle=None,
             display_name=tag,
         )
+
+    def tag_category_priority(self) -> int:
+        """Given a tag, return a number representing a rank; higher is better.
+
+        This lets us do the same total-sort-and-then-reverse thing we do to
+        identify images to keep.
+
+        Returns
+        -------
+        int
+            Tag priority rank.  Higher is better.
+        """
+        priority: dict[RSPImageType, int] = {}
+        for idx, entry in enumerate(RSPImageType):
+            if entry == RSPImageType.ALIAS:
+                continue
+            priority[entry] = len(RSPImageType) - idx
+        # Alias types are worse than UNKNOWN for this purpose (that is,
+        # they sort to the top of the spawner display, but they are
+        # useless for 'best tag' purposes
+        priority[RSPImageType.ALIAS] = 0
+        return priority[self.image_type]
 
     def __eq__(self, other: object) -> bool:
         return self.compare(other) == 0
@@ -271,28 +298,6 @@ class RSPImageTag:
                 return -1 if self.version.build < other.version.build else 1
         else:
             return -1 if other.version.build else 0
-
-    def tag_category_priority(self) -> int:
-        """Given a tag, return a number representing a rank; higher is better.
-
-        This lets us do the same total-sort-and-then-reverse thing we do to
-        identify images to keep.
-
-        Returns
-        -------
-        int
-            Tag priority rank.  Higher is better.
-        """
-        priority: dict[RSPImageType, int] = {}
-        for idx, entry in enumerate(RSPImageType):
-            if entry == RSPImageType.ALIAS:
-                continue
-            priority[entry] = len(RSPImageType) - idx
-        # Alias types are worse than UNKNOWN for this purpose (that is,
-        # they sort to the top of the spawner display, but they are
-        # useless for 'best tag' purposes
-        priority[RSPImageType.ALIAS] = 0
-        return priority[self.image_type]
 
     @classmethod
     def _from_match(
@@ -454,7 +459,7 @@ class RSPImageTagCollection:
     def from_tag_names(
         cls,
         tag_names: list[str],
-        aliases: set[str],
+        aliases: set[str] = ALIAS_TAGS,
         cycle: int | None = None,
     ) -> Self:
         """Create a collection from tag strings.
@@ -521,17 +526,15 @@ class RSPImageTagCollection:
     def best_tag(self) -> RSPImageTag | None:
         """Given the collection of tags, pick the highest priority one.
 
-        Alias tags are excluded from consideration in this case.
+        Alias tags are excluded from consideration in this case.  If the
+        collection only has alias tags (or the collection is empty), return
+        `None`.
         """
-        chosen: RSPImageTag | None = None
-        rank: int | None = None
-        for tag in self._by_tag:
-            rsptag = RSPImageTag.from_str(tag)
-            prio = rsptag.tag_category_priority()
-            if rank is None or rank > prio:
-                rank = prio
-                chosen = rsptag
-        return chosen
+        for tag in self.all_tags():
+            if tag.image_type is RSPImageType.ALIAS:
+                continue
+            return tag
+        return None
 
     def subset(
         self,
