@@ -28,8 +28,8 @@ def test_plan_count(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
-    victims = r.plan()
-    remainder = r.remaining(victims)
+    r.plan()
+    remainder = r.remaining()
     assert len(remainder.untagged) == 0
     assert len(remainder.rsp["release"]) == 3
     assert len(remainder.rsp["weekly"]) == 10
@@ -58,8 +58,8 @@ def test_plan_count_surplus(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
-    victims = r.plan()
-    remainder = r.remaining(victims)
+    r.plan()
+    remainder = r.remaining()
     initial = r._categorized
     assert len(remainder.untagged) == len(initial.untagged)
     assert len(remainder.rsp["release"]) == len(initial.rsp["release"])
@@ -96,8 +96,8 @@ def test_plan_count_time(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
-    victims = r.plan()
-    remainder = r.remaining(victims)
+    r.plan()
+    remainder = r.remaining()
     assert len(remainder.untagged) == 0
     assert len(remainder.rsp["release"]) == 0
     assert len(remainder.rsp["weekly"]) == 0
@@ -129,8 +129,8 @@ def test_plan_mixed(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
-    victims = r.plan()
-    remainder = r.remaining(victims)
+    r.plan()
+    remainder = r.remaining()
     initial = r._categorized
     assert len(remainder.untagged) == 0
     assert len(remainder.rsp["release"]) < len(initial.rsp["release"])
@@ -160,8 +160,8 @@ def test_which_victims(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
-    victims = r.plan()
-    remainder = r.remaining(victims)
+    r.plan()
+    remainder = r.remaining()
     initial = r._categorized
 
     weeklies = list(initial.rsp["weekly"].values())
@@ -170,5 +170,6 @@ def test_which_victims(ghcr_cfg: RegistryConfig) -> None:
 
     assert new_weekly in remainder.rsp["weekly"]
     assert old_weekly not in remainder.rsp["weekly"]
-    assert new_weekly not in victims
-    assert old_weekly in victims
+    assert r._plan is not None
+    assert new_weekly not in r._plan
+    assert old_weekly in r._plan

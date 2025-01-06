@@ -32,7 +32,7 @@ class Reaper:
             wrapper_class=structlog.make_filtering_bound_logger(log_level)
         )
         # Set up logging
-        self._logger = structlog.get_logger()
+        self._logger = structlog.get_logger(__name__)
         self._logger.debug("Initialized logging")
 
         # Common fields
@@ -80,14 +80,16 @@ class Reaper:
         self._storage.categorize()
         self._categorized = self._storage.categorized_images
 
-    def plan(self) -> dict[str, Image]:
+        self._plan: dict[str, Image] | None = None
+
+    def plan(self) -> None:
         """Use the KeepPolicy to plan a set of images to delete."""
         if self._image_version_class == ImageVersionClass.RSP.value:
-            return self._plan_rsp()
+            self._plan = self._plan_rsp()
         elif self._image_version_class == ImageVersionClass.SEMVER.value:
-            return self._plan_semver()
+            self._plan = self._plan_semver()
         else:
-            return self._plan_untagged()
+            self._plan = self._plan_untagged()
 
     def _plan_semver(self) -> dict[str, Image]:
         raise NotImplementedError("Semver image retention not yet implemented")
@@ -172,13 +174,34 @@ class Reaper:
         # Categorized images are already sorted
         return {x.digest: x for x in list(imgs.values())[keep_count:]}
 
-    def remaining(self, victims: dict[str, Image]) -> ImageCollection:
+    def report(self) -> None:
+        """Report on images which would be purged by plan execution."""
+        if self._plan is None:
+            self._logger.warning(
+                "No plan has been formulated and thus cannot be executed."
+            )
+            return
+        print("Images to purge:")
+        print("----------------")
+        imgsplits = [str(x).split(" ", 2) for x in self._plan.values()]
+        maxlen = max([len(x[0]) for x in imgsplits])
+        for imgsplit in imgsplits:
+            print(
+                imgsplit[0], " " * (maxlen + 1 - len(imgsplit[0])), imgsplit[1]
+            )
+
+    def remaining(self) -> ImageCollection:
         """Return an ImageCollection containing those images which
         would remain after the results of a plan were removed during that
         plan's execution.
         """
         retval = deepcopy(self._categorized)
-        for dig in victims:
+        if self._plan is None:
+            self._logger.warning(
+                "No plan has been formulated and thus cannot be executed."
+            )
+            return retval
+        for dig in self._plan:
             for category in ("untagged", "semver"):
                 immut = getattr(self._categorized, category)
                 mut = getattr(retval, category)

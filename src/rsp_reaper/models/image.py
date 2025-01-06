@@ -51,6 +51,35 @@ class Image:
     semver_tag: semver.VersionInfo | None = None
     version_class: ImageVersionClass | None = None
 
+    def __str__(self) -> str:
+        """Pretty(?)-printed version.  Humans care about tags, and digests
+        not so much.
+        """
+        colon_pos = self.digest.find(":")
+        dig = self.digest
+        if colon_pos > -1:
+            dig = self.digest[1 + colon_pos :]
+        if len(dig) > 8:
+            dig = dig[:8] + "..."
+        dig = f"<{dig}>"
+        if (
+            self.version_class == ImageVersionClass.SEMVER
+            and self.semver_tag is not None
+        ):
+            tag = self.semver_tag
+            vstr = f"{tag.major}.{tag.minor}.{tag.patch}"
+            if tag.prerelease:
+                vstr += f"-{tag.prerelease}"
+            if tag.build:
+                vstr += f"+{tag.build}"
+            return f"[{vstr}] {self.digest}"
+        elif (
+            self.version_class == ImageVersionClass.RSP
+            and self.rsp_image_tag is not None
+        ):
+            return f"[{self.rsp_image_tag.tag}] {dig}"
+        return f"[<untagged>] {dig}"
+
     def __eq__(self, other: object) -> bool:
         return self._compare(other) == 0
 

@@ -84,7 +84,7 @@ class ContainerRegistryClient:
             wrapper_class=structlog.make_filtering_bound_logger(log_level)
         )
         # Set up logging
-        self._logger = structlog.get_logger()
+        self._logger = structlog.get_logger(__name__)
         self._logger.debug("Initialized logging")
 
         # Common fields
