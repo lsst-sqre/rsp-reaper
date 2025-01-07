@@ -107,34 +107,30 @@ class GhcrClient(ContainerRegistryClient):
             count += 1
         self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
 
-    def _find_untagged(self) -> list[Image]:
-        ret: list[Image] = []
-        for dig in self._images:
-            g_img = self._images[dig]
-            if not g_img.tags:
-                ret.append(g_img)
-        return ret
-
-    def delete_untagged(self) -> None:
-        """Delete all untagged images."""
-        untagged = self._find_untagged()
+    def delete_images(self, inp: ImageSpec) -> None:
+        images = self._canonicalize_image_map(inp)
         count = 0
         dry = ""
         if self._dry_run:
             dry = " (not really)"
-        for u in untagged:
+        imgs = list(images.values())
+        for img in imgs:
+            if not img.id:
+                self._logger.error(f"Image {img.digest} has no ID")
+                continue
             url = (
                 f"{self._url}/orgs/{self._owner}/packages"
-                f"/container/{self._repository}/versions/{u.id}"
+                f"/container/{self._repository}/versions/{img.id}"
             )
             if not self._dry_run:
                 r = self._http_client.delete(url)
                 r.raise_for_status()
-            self._logger.debug(f"Image {u.digest} deleted{dry}")
+            self._logger.debug(f"Image {img.digest} deleted{dry}")
             count += 1
         self._logger.debug(f"Deleted {count} images{dry}")
-
-    def delete_images(self, inp: ImageSpec) -> None:
-        images = self._canonicalize_image_map(inp)
-        # Not implemented yet
-        _ = images
+        if not self._dry_run:
+            self._plan = None
+            digests = [x.digest for x in imgs]
+            for dig in digests:
+                if dig in self._images:
+                    del self._images[dig]

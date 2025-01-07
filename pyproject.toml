@@ -126,6 +126,10 @@ extend = "ruff-shared.toml"
     "PLR0912", # yes, RSP retention is complicated
     "T201",    # Reporting uses print
 ]
+"src/rsp_reaper/storage/gar.py" = [
+    "TRY004",  # That's not even a TypeError
+    "ERA001",  # It's a commented-out error message justifying the technique
+]
 "src/rsp_reaper/cli.py" = [
     "T201",    # Reporting uses print
 ]

@@ -2,14 +2,17 @@
 
 import datetime
 import json
+from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
 
 from google.cloud.artifactregistry_v1 import (
     ArtifactRegistryClient,
+    BatchDeleteVersionsRequest,
     ListDockerImagesRequest,
 )
 from google.cloud.artifactregistry_v1.types import DockerImage
+from google.protobuf.empty_pb2 import Empty
 
 from ..config import RegistryAuth, RegistryConfig
 from ..models.image import Image, ImageSpec, JSONImage
@@ -91,7 +94,11 @@ class GARClient(ContainerRegistryClient):
                 tzinfo=datetime.UTC,
             )
             tags = set(img.tags)
-            digest = img.name.split("@")[-1]
+            repo_path, digest = img.name.split("@", 2)
+            repo = repo_path.split("/")[-1]
+            if repo != self._repository:
+                self._logger.warning(f"Skipping image from repository {repo}")
+                continue
             ret[digest] = Image(digest=digest, tags=tags, date=dt)
         return ret
 
@@ -128,7 +135,40 @@ class GARClient(ContainerRegistryClient):
             f"{self._parent}/packages/{self._repository}/versions/{img.digest}"
         )
 
+    def _chunk_images(self, inp: list[Image], n: int) -> Iterator[list[Image]]:
+        for i in range(0, len(inp), n):
+            yield inp[i : i + n]
+
     def delete_images(self, inp: ImageSpec) -> None:
         images = self._canonicalize_image_map(inp)
-        # Not implemented yet
-        _ = images
+        digests = list(images.keys())
+        names = [self._image_to_name(x) for x in list(images.values())]
+        dry = " (not really)" if self._dry_run else ""
+        count = len(digests)
+        limit = 50
+        # Empirical:
+        #
+        # google.api_core.exceptions.InvalidArgument: 400
+        # A maximum of 50 versions are allowed per request
+        for chunk in self._chunk_images(list(images.values()), limit):
+            names = [self._image_to_name(x) for x in chunk]
+            req = BatchDeleteVersionsRequest(
+                parent=f"{self._parent}/packages/{self._repository}",
+                names=names,
+                validate_only=self._dry_run,
+            )
+            self._logger.debug(f"Request: {req}")
+            self._logger.info(f"Deleting images {names}{dry}")
+            operation = self._client.batch_delete_versions(request=req)
+            resp = operation.result()
+            if not isinstance(resp, Empty):
+                e_str = "Something went wrong with batch deletion: {resp}"
+                self._logger.error(e_str, response=resp)
+                raise RuntimeError(e_str)
+        self._logger.info(f"Deleted {count} images{dry}")
+        if not self._dry_run:
+            self._plan = None
+            for dig in digests:
+                if dig in self._images:
+                    del self._images[dig]
+            return

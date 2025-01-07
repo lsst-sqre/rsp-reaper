@@ -119,6 +119,24 @@ class DockerHubClient(ContainerRegistryClient):
         self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
 
     def delete_images(self, inp: ImageSpec) -> None:
+        """Delete images.
+
+        https://distribution.github.io/distribution/spec/api/#deleting-an-image
+        """
         images = self._canonicalize_image_map(inp)
-        # Not implemented yet
-        _ = images
+        url = f"{self._url}/v2/{self._owner}/{self._repository}/manifests/"
+        dry = " (not really)" if self._dry_run else ""
+        count = 0
+        for dig in images:
+            ep = f"{url}{dig}"
+            self._logger.debug(f"Deleting image {dig}{dry}")
+            if not self._dry_run:
+                r = self._http_client.delete(ep)
+                r.raise_for_status()
+            count += 1
+        self._logger.info(f"Deleted {count} images{dry}")
+        if not self._dry_run:
+            self._plan = None
+            for dig in images:
+                if dig in self._images:
+                    del self._images[dig]
