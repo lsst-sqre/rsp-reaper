@@ -35,7 +35,8 @@ class GhcrClient(ContainerRegistryClient):
 
     def authenticate(self, auth: RegistryAuth) -> None:
         """Use the 'password' field as the token.  Other fields ignored."""
-        self._http_client.headers["authorization"] = f"Bearer {auth.password}"
+        token = auth.password.get_secret_value() if auth.password else ""
+        self._http_client.headers["authorization"] = f"Bearer {token}"
 
     def scan_repo(self) -> None:
         url = (

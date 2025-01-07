@@ -34,7 +34,12 @@ class DockerHubClient(ContainerRegistryClient):
 
     def authenticate(self, i_auth: RegistryAuth) -> None:
         url = f"{self._url}/v2/users/login"
-        auth = {"username": i_auth.username, "password": i_auth.password}
+        auth = {
+            "username": i_auth.username,
+            "password": (
+                i_auth.password.get_secret_value() if i_auth.password else ""
+            ),
+        }
         r = self._http_client.post(url, json=auth)
         r.raise_for_status()  # Maybe we'll do 2fa sometime?
         self._logger.info(f"Authenticated '{i_auth.username}' to Docker Hub")

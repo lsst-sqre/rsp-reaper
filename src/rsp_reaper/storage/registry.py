@@ -78,7 +78,6 @@ class ContainerRegistryClient:
         # Establish debugging and dry-run first.
         self._debug = cfg.debug
         self._dry_run = cfg.dry_run
-
         log_level = logging.DEBUG if self._debug else logging.INFO
         structlog.configure(
             wrapper_class=structlog.make_filtering_bound_logger(log_level)
@@ -97,13 +96,13 @@ class ContainerRegistryClient:
         self.name = str(HttpUrl(name))
         # Set up logging
         self._logger = structlog.get_logger(self.name)
-        self._logger.debug(f"Initialized logging for {self.name}")
-
+        self._logger.debug(
+            f"Initialized logging for storage driver {self.name}"
+        )
         # Initialize empty image map
         self._images: dict[str, Image] = {}
         # Initialize empty categorized image map
         self.categorized_images = ImageCollection()
-
         # Load inputs if supplied
         if cfg.input_file:
             self.debug_load_images(cfg.input_file)
@@ -136,6 +135,7 @@ class ContainerRegistryClient:
                 t_tag = raw_tags[0] if len(img.tags) > 0 else "unknown"
                 rsp_image_tag = RSPImageTag.from_str(t_tag)
             img.rsp_image_tag = rsp_image_tag
+            img.version_class = self._image_version_class
 
         categorized_unsorted = self._categorize_unsorted_rsp_images(
             unsorted_tagged
@@ -197,6 +197,8 @@ class ContainerRegistryClient:
         self.categorized_images.untagged = {
             x.digest: x for x in sorted(list(untagged.values()), reverse=True)
         }
+        for img in self.categorized_images.untagged.values():
+            img.version_class = ImageVersionClass.UNTAGGED
 
     def _canonicalize_image_map(self, inp: ImageSpec) -> dict[str, Image]:
         """Take any of the ways of specifying images (dict of digest to

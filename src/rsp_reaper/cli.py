@@ -5,7 +5,7 @@ import code
 from pathlib import Path
 
 from .config import Config
-from .reaper import BuckDharma
+from .services.reaper import BuckDharma
 
 
 def _parse_args() -> argparse.Namespace:
@@ -71,4 +71,7 @@ def cowbell() -> None:
     else:
         boc.populate()
         boc.plan()
-        boc.reap()
+        if args.dry_run:
+            boc.report()
+        else:
+            boc.reap()
