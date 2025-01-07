@@ -106,9 +106,12 @@ class DockerHubClient(ContainerRegistryClient):
             )
         jsons = inp["data"]
         self._images = {}
+        count = 0
         for digest in jsons:
+            count += 1
             obj = cast(JSONImage, jsons[digest])
             self._images[digest] = Image.from_json(obj)
+        self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
 
     def delete_images(self, inp: ImageSpec) -> None:
         images = self._canonicalize_image_map(inp)

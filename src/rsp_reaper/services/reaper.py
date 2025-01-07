@@ -31,10 +31,6 @@ class Reaper:
         structlog.configure(
             wrapper_class=structlog.make_filtering_bound_logger(log_level)
         )
-        # Set up logging
-        self._logger = structlog.get_logger(__name__)
-        self._logger.debug("Initialized logging")
-
         # Common fields
         self._registry = cfg.registry
         self._owner = cfg.owner
@@ -65,6 +61,9 @@ class Reaper:
         self._plan: dict[str, Image] | None = None
         self._input_file = cfg.input_file
         self.name = self._storage.name
+        # Set up logging
+        self._logger = structlog.get_logger(f"reaper-{self.name}")
+        self._logger.debug(f"Initialized logging for reaper {self.name}")
 
     def populate(self) -> None:
         if not self._storage:
@@ -170,14 +169,16 @@ class Reaper:
                 "No plan has been formulated and thus cannot be executed."
             )
             return
-        print("Images to purge:")
-        print("----------------")
+        headline = f"Images to purge for {self.name}:"
+        print(headline)
+        print("-" * len(headline))
         imgsplits = [str(x).split(" ", 2) for x in self._plan.values()]
         maxlen = max([len(x[0]) for x in imgsplits])
         for imgsplit in imgsplits:
             print(
                 imgsplit[0], " " * (maxlen + 1 - len(imgsplit[0])), imgsplit[1]
             )
+        print("\n")
 
     def remaining(self) -> ImageCollection:
         """Return an ImageCollection containing those images which
@@ -227,3 +228,23 @@ class BuckDharma:
         for reg in cfg.registries:
             reaper = Reaper(reg)
             self.reaper[reaper.name] = reaper
+
+    def populate(self) -> None:
+        reapers = self.reaper.values()
+        for reaper in reapers:
+            reaper.populate()
+
+    def plan(self) -> None:
+        reapers = self.reaper.values()
+        for reaper in reapers:
+            reaper.plan()
+
+    def report(self) -> None:
+        reapers = self.reaper.values()
+        for reaper in reapers:
+            reaper.report()
+
+    def reap(self) -> None:
+        reapers = self.reaper.values()
+        for reaper in reapers:
+            reaper.reap()

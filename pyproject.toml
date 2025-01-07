@@ -136,6 +136,10 @@ extend = "ruff-shared.toml"
     "S101",    # Tests can use assert
 ]
 
+"harnesses/**.py" = [
+    "T201",   # Harnesses print during setup
+]
+
 [tool.ruff.lint.isort]
 known-first-party = ["rsp_reaper", "tests", "harnesses"]
 split-on-trailing-comma = false

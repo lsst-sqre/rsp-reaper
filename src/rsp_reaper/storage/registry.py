@@ -83,10 +83,6 @@ class ContainerRegistryClient:
         structlog.configure(
             wrapper_class=structlog.make_filtering_bound_logger(log_level)
         )
-        # Set up logging
-        self._logger = structlog.get_logger(__name__)
-        self._logger.debug("Initialized logging")
-
         # Common fields
         self._registry = str(cfg.registry)
         self._owner = cfg.owner
@@ -99,6 +95,9 @@ class ContainerRegistryClient:
             name += self._namespace + "/"
         name += self._repository
         self.name = str(HttpUrl(name))
+        # Set up logging
+        self._logger = structlog.get_logger(self.name)
+        self._logger.debug(f"Initialized logging for {self.name}")
 
         # Initialize empty image map
         self._images: dict[str, Image] = {}

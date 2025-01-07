@@ -96,12 +96,15 @@ class GhcrClient(ContainerRegistryClient):
         jsons = inp["data"]
         self._images = {}
         self._image_by_id = {}
+        count = 0
         for digest in jsons:
             id = jsons[digest]["id"]
             obj = cast(JSONImage, jsons[digest])
             img = Image.from_json(obj)
             self._images[digest] = img
             self._image_by_id[id] = img
+            count += 1
+        self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
 
     def _find_untagged(self) -> list[Image]:
         ret: list[Image] = []

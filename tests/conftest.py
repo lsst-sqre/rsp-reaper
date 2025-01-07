@@ -1,8 +1,11 @@
 """Test fixtures for registry image reaper."""
 
+from collections.abc import Iterator
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
+import yaml
 from pydantic import HttpUrl
 
 from rsp_reaper.config import KeepPolicy, RegistryConfig
@@ -81,3 +84,24 @@ def dockerhub_cfg() -> RegistryConfig:
 def dockerhub_client(dockerhub_cfg: RegistryConfig) -> DockerHubClient:
     """Client for Docker Hub."""
     return DockerHubClient(cfg=dockerhub_cfg)
+
+
+@pytest.fixture(scope="session")
+def test_config() -> Iterator[Path]:
+    """YAML configuration file."""
+    with TemporaryDirectory() as td:
+        new_config = Path(td) / "config.yaml"
+        support_dir = Path(__file__).parent / "support"
+        config = yaml.safe_load((support_dir / "config.yaml").read_text())
+        config["registries"][0]["input_file"] = str(
+            support_dir / "gar.contents.json"
+        )
+        config["registries"][1]["input_file"] = str(
+            support_dir / "ghcr.io.contents.json"
+        )
+        config["registries"][2]["input_file"] = str(
+            support_dir / "docker.io.contents.json"
+        )
+        new_config.write_text(yaml.dump(config))
+
+        yield new_config

@@ -69,10 +69,6 @@ def cowbell() -> None:
         print("---------------------------------------")
         code.interact(local=locals())
     else:
-        reapers = boc.reaper.values()
-        for reaper in reapers:
-            reaper.populate()
-        for reaper in reapers:
-            reaper.plan()
-        for reaper in reapers:
-            reaper.reap()
+        boc.populate()
+        boc.plan()
+        boc.reap()
