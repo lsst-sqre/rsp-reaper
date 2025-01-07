@@ -21,17 +21,18 @@ class GARClient(ContainerRegistryClient):
     """Client for Google Artifact Registry."""
 
     def __init__(self, cfg: RegistryConfig) -> None:
-        if cfg.category != RegistryCategory.GAR.value:
+        if cfg.category != RegistryCategory.GAR:
             raise ValueError(
                 "GAR registry client must have value "
-                f"'{RegistryCategory.GAR.value}', not '{cfg.category}'"
+                f"'{RegistryCategory.GAR.value}', not '{cfg.category.value}'"
             )
         self._category = cfg.category
         super()._extract_registry_config(cfg)
-        gar_loc = "-docker.pkg.dev"
+        gar_loc = "-docker.pkg.dev/"
         if not self._registry.endswith(gar_loc):
             raise ValueError(
-                f"GAR registry location must end with '{gar_loc}'"
+                f"GAR registry location ('{self._registry}') must "
+                f"end with '{gar_loc}'"
             )
         location = self._registry[len("https://") : -(len(gar_loc))]
 

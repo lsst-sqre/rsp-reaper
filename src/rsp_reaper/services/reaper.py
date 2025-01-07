@@ -5,10 +5,10 @@ import logging
 import os
 from copy import deepcopy
 
-import pytimeparse
 import structlog
+from pydantic import SecretStr
 
-from ..config import RegistryAuth, RegistryConfig
+from ..config import Config, RegistryAuth, RegistryConfig
 from ..models.image import Image, ImageCollection, ImageVersionClass
 from ..models.registry_category import RegistryCategory
 from ..models.rsptag import RSP_TYPENAMES
@@ -40,53 +40,48 @@ class Reaper:
         self._owner = cfg.owner
         self._repository = cfg.repository
         self._namespace = cfg.namespace
-
-        # Validate category
-        categories = [x.value for x in RegistryCategory]
-        if cfg.category not in categories:
-            raise ValueError(f"{cfg.category} not in {categories}")
         self._category = cfg.category
-        self._auth = RegistryAuth(realm=cfg.registry)
-
+        self._category = cfg.category
+        self._auth = RegistryAuth()
+        self._image_version_class = cfg.image_version_class
         self._storage: ContainerRegistryClient | None = None
         match self._category:
-            case RegistryCategory.DOCKERHUB.value:
+            case RegistryCategory.DOCKERHUB:
                 self._storage = DockerHubClient(cfg=cfg)
                 self._auth.username = os.getenv("DOCKERHUB_USER")
-                self._auth.password = os.getenv("DOCKERHUB_PASSWORD")
-            case RegistryCategory.GAR.value:
+                self._auth.password = SecretStr(
+                    os.getenv("DOCKERHUB_PASSWORD", "")
+                )
+            case RegistryCategory.GAR:
                 self._storage = GARClient(cfg=cfg)
-            case RegistryCategory.GHCR.value:
-                self._auth.password = os.getenv("GHCR_TOKEN")
+            case RegistryCategory.GHCR:
+                self._auth.password = SecretStr(os.getenv("GHCR_TOKEN", ""))
                 self._storage = GhcrClient(cfg=cfg)
             case _:
                 raise NotImplementedError(
                     f"Storage driver for {self._category} not implemented yet"
                 )
-        vclasses = [x.value.lower() for x in ImageVersionClass]
-        if cfg.image_version_class not in vclasses:
-            raise ValueError(
-                f"Image version class '{cfg.image_version_class}' not in"
-                f"{vclasses}"
-            )
-        self._image_version_class = cfg.image_version_class
         self._keep_policy = cfg.keep
+        self._plan: dict[str, Image] | None = None
+        self._input_file = cfg.input_file
+        self.name = self._storage.name
 
-        if not cfg.input_file:
+    def populate(self) -> None:
+        if not self._storage:
+            self._logger.warning("No storage driver defined.")
+            return
+        if not self._input_file:
             # We don't have preloaded data, so run a repo scan.
             self._storage.authenticate(self._auth)
             self._storage.scan_repo()
-
         self._storage.categorize()
         self._categorized = self._storage.categorized_images
 
-        self._plan: dict[str, Image] | None = None
-
     def plan(self) -> None:
         """Use the KeepPolicy to plan a set of images to delete."""
-        if self._image_version_class == ImageVersionClass.RSP.value:
+        if self._image_version_class == ImageVersionClass.RSP:
             self._plan = self._plan_rsp()
-        elif self._image_version_class == ImageVersionClass.SEMVER.value:
+        elif self._image_version_class == ImageVersionClass.SEMVER:
             self._plan = self._plan_semver()
         else:
             self._plan = self._plan_untagged()
@@ -124,11 +119,7 @@ class Reaper:
 
             if pol.number is None:
                 if pol.age is not None:
-                    seconds = pytimeparse.parse(pol.age)
-                    if seconds is not None:
-                        retval.update(
-                            self._plan_age(seconds=seconds, imgs=imgs)
-                        )
+                    retval.update(self._plan_age(pol.age, imgs=imgs))
             elif pol.number >= 0:
                 retval.update(
                     self._plan_number(keep_count=pol.number, imgs=imgs)
@@ -137,14 +128,13 @@ class Reaper:
         return retval
 
     def _plan_untagged(self) -> dict[str, Image]:
+        if self._keep_policy.untagged is None:
+            return {}
         if self._keep_policy.untagged.number is None:
             if self._keep_policy.untagged.age is None:
                 return {}
-            seconds = pytimeparse.parse(self._keep_policy.untagged.age)
-            if seconds is None:
-                return {}
             return self._plan_age(
-                seconds=seconds, imgs=self._categorized.untagged
+                self._keep_policy.untagged.age, imgs=self._categorized.untagged
             )
         if self._keep_policy.untagged.number < 0:
             return {}
@@ -154,11 +144,10 @@ class Reaper:
         )
 
     def _plan_age(
-        self, seconds: float, imgs: dict[str, Image]
+        self, age: datetime.timedelta, imgs: dict[str, Image]
     ) -> dict[str, Image]:
         retval: dict[str, Image] = {}
         now = datetime.datetime.now(tz=datetime.UTC)
-        age = datetime.timedelta(seconds=seconds)
         cutoff = now - age
         for dig, img in imgs.items():
             if img.date is None:
@@ -215,3 +204,26 @@ class Reaper:
                     if dig == img:
                         del mut[nam][dig]
         return retval
+
+    def reap(self) -> None:
+        if self._plan is None:
+            self._logger.warning(
+                "No plan has been formulated and thus cannot be executed."
+            )
+            return
+        if self._storage is None:
+            # No need to warn: self._plan wouldn't get populated without
+            # a storage driver.
+            return
+        self._storage.delete_images(self._plan)
+        self._plan = None
+
+
+class BuckDharma:
+    """Buck Dharma is in charge of all the Reapers."""
+
+    def __init__(self, cfg: Config, *, interactive: bool = False) -> None:
+        self.reaper: dict[str, Reaper] = {}
+        for reg in cfg.registries:
+            reaper = Reaper(reg)
+            self.reaper[reaper.name] = reaper

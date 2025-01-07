@@ -7,7 +7,8 @@
 
 google-cloud-artifact-registry
 httpx
-pytimeparse
+pyyaml
+safir
 semver
 structlog
 

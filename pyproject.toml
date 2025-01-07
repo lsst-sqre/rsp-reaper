@@ -23,7 +23,7 @@ dependencies = []
 dynamic = ["version"]
 
 [project.scripts]
-cowbell = "rsp_reaper.cli:main"
+cowbell = "rsp_reaper.cli:cowbell"
 
 [project.urls]
 Source = "https://github.com/lsst-sqre/rsp-reaper"
@@ -126,6 +126,9 @@ extend = "ruff-shared.toml"
     "PLR0912", # yes, RSP retention is complicated
     "T201",    # Reporting uses print
 ]
+"src/rsp_reaper/cli.py" = [
+    "T201",    # Reporting uses print
+]
 
 "tests/**.py" = [
     "SLF001",  # Tests are allowed to access private members
@@ -134,7 +137,7 @@ extend = "ruff-shared.toml"
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["rsp_reaper", "tests"]
+known-first-party = ["rsp_reaper", "tests", "harnesses"]
 split-on-trailing-comma = false
 
 [tool.ruff.lint.flake8-bugbear]

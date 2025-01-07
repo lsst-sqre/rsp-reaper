@@ -2,7 +2,10 @@
 
 import os
 
+from pydantic import HttpUrl
+
 from rsp_reaper.config import KeepPolicy, RegistryAuth, RegistryConfig
+from rsp_reaper.models.registry_category import RegistryCategory
 from rsp_reaper.storage.dockerhub import DockerHubClient
 
 # We want to explode if the auth isn't set.
@@ -11,8 +14,8 @@ auth = RegistryAuth(
     password=os.environ["DOCKERHUB_PASSWORD"],
 )
 cfg = RegistryConfig(
-    category="hub.docker.com",
-    registry="https://docker.io",
+    category=RegistryCategory.DOCKERHUB,
+    registry=HttpUrl("https://docker.io"),
     owner="lsstsqre",
     repository="sciplat-lab",
     keep=KeepPolicy(),

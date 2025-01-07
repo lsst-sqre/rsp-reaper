@@ -3,8 +3,11 @@
 from pathlib import Path
 
 import pytest
+from pydantic import HttpUrl
 
 from rsp_reaper.config import KeepPolicy, RegistryConfig
+from rsp_reaper.models.image import ImageVersionClass
+from rsp_reaper.models.registry_category import RegistryCategory
 from rsp_reaper.storage.dockerhub import DockerHubClient
 from rsp_reaper.storage.gar import GARClient
 from rsp_reaper.storage.ghcr import GhcrClient
@@ -15,13 +18,13 @@ def gar_cfg() -> RegistryConfig:
     """Config for Google Artifact Registry."""
     input_file = Path(__file__).parent / "support" / "gar.contents.json"
     return RegistryConfig(
-        category="pkg.dev",
-        registry="https://us-central1-docker.pkg.dev",
+        category=RegistryCategory.GAR,
+        registry=HttpUrl("https://us-central1-docker.pkg.dev"),
         owner="rubin-shared-services-71ec",
         namespace="sciplat",
         repository="sciplat-lab",
         keep=KeepPolicy(),
-        image_version_class="rsp",
+        image_version_class=ImageVersionClass.RSP,
         dry_run=True,
         debug=True,
         input_file=input_file,
@@ -39,12 +42,12 @@ def ghcr_cfg() -> RegistryConfig:
     """Config for GitHub Container Registry."""
     input_file = Path(__file__).parent / "support" / "ghcr.io.contents.json"
     return RegistryConfig(
-        category="ghcr.io",
-        registry="https://ghcr.io",
+        category=RegistryCategory.GHCR,
+        registry=HttpUrl("https://ghcr.io"),
         owner="lsst-sqre",
         repository="sciplat-lab",
         keep=KeepPolicy(),
-        image_version_class="rsp",
+        image_version_class=ImageVersionClass.RSP,
         dry_run=True,
         debug=True,
         input_file=input_file,
@@ -62,12 +65,12 @@ def dockerhub_cfg() -> RegistryConfig:
     """Config for DockerHub."""
     input_file = Path(__file__).parent / "support" / "docker.io.contents.json"
     return RegistryConfig(
-        category="hub.docker.com",
-        registry="https://docker.io",
+        category=RegistryCategory.DOCKERHUB,
+        registry=HttpUrl("https://docker.io"),
         owner="lsstsqre",
         repository="sciplat-lab",
         keep=KeepPolicy(),
-        image_version_class="rsp",
+        image_version_class=ImageVersionClass.RSP,
         dry_run=True,
         debug=True,
         input_file=input_file,

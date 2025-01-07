@@ -310,3 +310,12 @@ class ImageCollection:
         for typ in RSP_TYPENAMES:
             retval[f"rsp_{typ}"] = len(self.rsp[typ])
         return retval
+
+    def remove_item(self, dig: str) -> None:
+        if dig in self.untagged:
+            del self.untagged[dig]
+        if dig in self.semver:
+            del self.semver[dig]
+        for typ in RSP_TYPENAMES:
+            if dig in self.rsp[typ]:
+                del self.rsp[typ][dig]

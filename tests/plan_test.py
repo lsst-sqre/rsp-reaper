@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+from safir.datetime import parse_timedelta as pt
+
 from rsp_reaper.config import (
     IndividualKeepPolicy,
     KeepPolicy,
@@ -28,6 +30,7 @@ def test_plan_count(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
+    r.populate()
     r.plan()
     remainder = r.remaining()
     assert len(remainder.untagged) == 0
@@ -58,6 +61,7 @@ def test_plan_count_surplus(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
+    r.populate()
     r.plan()
     remainder = r.remaining()
     initial = r._categorized
@@ -84,18 +88,19 @@ def test_plan_count_time(ghcr_cfg: RegistryConfig) -> None:
     new_cfg = deepcopy(ghcr_cfg)
     kp = KeepPolicy(
         semver=None,
-        untagged=IndividualKeepPolicy(age="0s"),
+        untagged=IndividualKeepPolicy(age=pt("0s")),
         rsp=RSPKeepers(
-            release=IndividualKeepPolicy(age="0s"),
-            weekly=IndividualKeepPolicy(age="0s"),
-            daily=IndividualKeepPolicy(age="0s"),
-            release_candidate=IndividualKeepPolicy(age="0s"),
-            experimental=IndividualKeepPolicy(age="0s"),
-            unknown=IndividualKeepPolicy(age="0s"),
+            release=IndividualKeepPolicy(age=pt("0s")),
+            weekly=IndividualKeepPolicy(age=pt("0s")),
+            daily=IndividualKeepPolicy(age=pt("0s")),
+            release_candidate=IndividualKeepPolicy(age=pt("0s")),
+            experimental=IndividualKeepPolicy(age=pt("0s")),
+            unknown=IndividualKeepPolicy(age=pt("0s")),
         ),
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
+    r.populate()
     r.plan()
     remainder = r.remaining()
     assert len(remainder.untagged) == 0
@@ -119,16 +124,17 @@ def test_plan_mixed(ghcr_cfg: RegistryConfig) -> None:
         semver=None,
         untagged=IndividualKeepPolicy(number=0),
         rsp=RSPKeepers(
-            release=IndividualKeepPolicy(age="180 days"),
+            release=IndividualKeepPolicy(age=pt("180d")),
             weekly=IndividualKeepPolicy(number=13),
             daily=IndividualKeepPolicy(number=25),
-            release_candidate=IndividualKeepPolicy(age="90 days"),
+            release_candidate=IndividualKeepPolicy(age=pt("90d")),
             experimental=IndividualKeepPolicy(number=4),
             unknown=IndividualKeepPolicy(number=0),
         ),
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
+    r.populate()
     r.plan()
     remainder = r.remaining()
     initial = r._categorized
@@ -160,6 +166,7 @@ def test_which_victims(ghcr_cfg: RegistryConfig) -> None:
     )
     new_cfg.keep = kp
     r = Reaper(cfg=new_cfg)
+    r.populate()
     r.plan()
     remainder = r.remaining()
     initial = r._categorized

@@ -17,10 +17,10 @@ class GhcrClient(ContainerRegistryClient):
     """Storage client for communication with ghcr.io."""
 
     def __init__(self, cfg: RegistryConfig) -> None:
-        if cfg.category != RegistryCategory.GHCR.value:
+        if cfg.category != RegistryCategory.GHCR:
             raise ValueError(
                 "GHCR registry client must have value "
-                f"'{RegistryCategory.GHCR.value}', not '{cfg.category}'"
+                f"'{RegistryCategory.GHCR.value}', not '{cfg.category.value}'"
             )
         super()._extract_registry_config(cfg)
         self._http_client = httpx.Client()

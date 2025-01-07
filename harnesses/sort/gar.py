@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
+from pydantic import HttpUrl
+
 from rsp_reaper.config import KeepPolicy, RegistryConfig
+from rsp_reaper.registry_category import RegistryCategory
 from rsp_reaper.storage.gar import GARClient
 
 input_file = (
@@ -13,8 +16,8 @@ input_file = (
 )
 
 cfg = RegistryConfig(
-    category="pkg.dev",
-    registry="https://us-central1-docker.pkg.dev",
+    category=RegistryCategory.GAR,
+    registry=HttpUrl("https://us-central1-docker.pkg.dev"),
     owner="rubin-shared-services-71ec",
     namespace="sciplat",
     repository="sciplat-lab",

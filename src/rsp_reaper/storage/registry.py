@@ -7,10 +7,10 @@ from typing import cast
 
 import semver
 import structlog
+from pydantic import HttpUrl
 
 from ..config import RegistryAuth, RegistryConfig
 from ..models.image import Image, ImageCollection, ImageSpec, ImageVersionClass
-from ..models.registry_category import RegistryCategory
 from ..models.rsptag import (
     ALIAS_TAGS,
     RSP_TYPENAMES,
@@ -88,38 +88,17 @@ class ContainerRegistryClient:
         self._logger.debug("Initialized logging")
 
         # Common fields
-        self._registry = cfg.registry
+        self._registry = str(cfg.registry)
         self._owner = cfg.owner
         self._repository = cfg.repository
         self._namespace = cfg.namespace
-
-        # Validate image class
-        vclasses = [x.value.lower() for x in ImageVersionClass]
-        if cfg.image_version_class not in vclasses:
-            raise ValueError(
-                f"Image version class '{cfg.image_version_class}' not in"
-                f"{vclasses}"
-            )
-        match cfg.image_version_class:
-            case "rsp":
-                self._image_version_class = ImageVersionClass.RSP
-            case "semver":
-                self._image_version_class = ImageVersionClass.SEMVER
-            case "untagged":
-                # Why would you do this?
-                self._image_version_class = ImageVersionClass.UNTAGGED
-                self._logger.warning("image_version_class is 'untagged'")
-            case _:
-                raise NotImplementedError(
-                    f"image_version_class '{cfg.image_version_class}' not "
-                    "yet implemented"
-                )
-
-        # Validate category
-        categories = [x.value for x in RegistryCategory]
-        if cfg.category not in categories:
-            raise ValueError(f"{cfg.category} not in {categories}")
+        self._image_version_class = cfg.image_version_class
         self._category = cfg.category
+        name = self._registry + self._owner + "/"
+        if self._namespace:
+            name += self._namespace + "/"
+        name += self._repository
+        self.name = str(HttpUrl(name))
 
         # Initialize empty image map
         self._images: dict[str, Image] = {}

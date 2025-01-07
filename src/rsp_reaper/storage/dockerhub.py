@@ -21,10 +21,11 @@ class DockerHubClient(ContainerRegistryClient):
     """Client for talking to docker.io / hub.docker.com."""
 
     def __init__(self, cfg: RegistryConfig) -> None:
-        if cfg.category != RegistryCategory.DOCKERHUB.value:
+        if cfg.category != RegistryCategory.DOCKERHUB:
             raise ValueError(
                 "DockerHub registry client must have value "
-                f"'{RegistryCategory.DOCKERHUB.value}', not '{cfg.category}'"
+                f"'{RegistryCategory.DOCKERHUB.value}', not "
+                f"'{cfg.category.value}'"
             )
         super()._extract_registry_config(cfg)
         self._http_client = httpx.Client()
@@ -108,80 +109,6 @@ class DockerHubClient(ContainerRegistryClient):
         for digest in jsons:
             obj = cast(JSONImage, jsons[digest])
             self._images[digest] = Image.from_json(obj)
-
-    def _find_untagged(self) -> list[Image]:
-        untagged: list[Image] = []
-        for digest in self._images:
-            img = self._images[digest]
-            if not img.tags:
-                untagged.append(img)
-        return untagged
-
-    def delete_untagged(self) -> None:
-        """Delete all untagged images."""
-        ### This API goes away Nov. 15, 2023.  Possibly December 11.
-        #
-        # But it doesn't seem to actually remove anything as of October 20,
-        # 2023.
-        manifests = [
-            {"repository": self._repository, "digest": x.digest}
-            for x in self._find_untagged()
-        ]
-        now = datetime.datetime.now(tz=datetime.UTC)
-        now - datetime.timedelta(days=30)
-        count = 0
-        dry = ""
-        if self._dry_run:
-            dry = " (not really)"
-        for m in manifests:
-            payload = {
-                "dry_run": self._dry_run,
-                "manifests": [m],
-            }
-            r = self._http_client.post(
-                f"{self._url}/v2/namespaces/{self._owner}/delete-images",
-                json=payload,
-            )
-            r.raise_for_status()
-            self._logger.debug(f"Image {m['digest']} deleted{dry}")
-            count += 1
-        self._logger.debug(f"Deleted {count} images{dry}")
-
-    def deprecated_find_all(self) -> None:
-        ### This API goes away Nov. 15, 2023.  Possibly December 11.
-        next_page = (
-            f"{self._url}/v2/namespaces/{self._owner}"
-            f"/repositories/{self._repository}/images"
-        )
-        page_size = 100
-        params = {"page_size": page_size}
-        count = 0
-        while next_page:
-            self._logger.debug(
-                f"Requesting {self._owner}/{self._repository}: images "
-                f"{count*page_size + 1}-{(count+1) * page_size}"
-            )
-            r = self._http_client.get(next_page, params=params)
-            r.raise_for_status()
-            obj = r.json()
-            results = obj["results"]
-            for res in results:
-                digest = res["digest"]
-                date = res["last_pushed"]
-                if date is None:
-                    # Don't ask me why this is coming back as None
-                    date = "1984-01-01T00:00:00.000000Z"
-                self._upsert_image(digest, date, None)
-                if res["tags"]:
-                    for t in res["tags"]:
-                        tag = t["tag"]
-                        if tag in LATEST_TAGS:
-                            # ignore all of these: they're just clutter.
-                            continue
-                        self._upsert_image(digest, date, tag)
-            next_page = obj["next"]
-            count += 1
-        self._logger.debug(f"Found {len(list(self._images.keys()))} images")
 
     def delete_images(self, inp: ImageSpec) -> None:
         images = self._canonicalize_image_map(inp)
