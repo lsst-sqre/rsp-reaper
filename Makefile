@@ -16,10 +16,6 @@ init:
 	uv pip install --upgrade pre-commit tox
 	pre-commit install
 
-.PHONY: run
-run:
-	tox run -e run
-
 .PHONY: update
 update: update-deps init
 

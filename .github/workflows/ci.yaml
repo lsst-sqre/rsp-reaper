@@ -27,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.0
@@ -39,7 +39,8 @@ jobs:
     strategy:
       matrix:
         python:
-          - "3.11"
+          - "3.12"
+          - "3.13"
 
     steps:
       - uses: actions/checkout@v4
@@ -50,38 +51,6 @@ jobs:
           python-version: ${{ matrix.python }}
           tox-envs: "py,coverage-report,typing"
 
-  docs:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Ensure the documentation gets the right version.
-          fetch-depth: 0
-
-      - name: Run tox
-        uses: lsst-sqre/run-tox@v1
-        with:
-          python-version: "3.11"
-          tox-envs: "docs"
-          cache-key-prefix: "docs"
-
-      # Only attempt documentation uploads for long-lived branches, tagged
-      # releases, and pull requests from ticket branches.  This avoids version
-      # clutter in the docs and failures when a PR doesn't have access to
-      # secrets.
-      - name: Upload to LSST the Docs
-        uses: lsst-sqre/ltd-upload@v1
-        with:
-          project: nublado
-          dir: "docs/_build/html"
-          username: ${{ secrets.LTD_USERNAME }}
-          password: ${{ secrets.LTD_PASSWORD }}
-        if: >
-          github.event_name != 'merge_group'
-          && (github.event_name != 'pull_request'
-              || startsWith(github.head_ref, 'tickets/'))
 
   build:
     runs-on: ubuntu-latest
