@@ -8,7 +8,6 @@ from typing import Annotated, Any, ClassVar, Self
 
 import yaml
 from pydantic import (
-    BaseModel,
     BeforeValidator,
     Field,
     HttpUrl,
@@ -27,7 +26,7 @@ def _empty_str_is_none(inp: Any) -> Any:
     return inp
 
 
-class RegistryAuth(BaseModel):
+class RegistryAuth(CamelCaseModel):
     """Generic authentication item for a container registry."""
 
     realm: Annotated[
@@ -61,7 +60,7 @@ class RegistryAuth(BaseModel):
     ] = None
 
 
-class IndividualKeepPolicy(BaseModel):
+class IndividualKeepPolicy(CamelCaseModel):
     """The policy has both a 'number' and an 'age' field.  'number'
     means keep that many of whatever image class this is attached to.
     `-1` or `None` means "do not reap that class at all". and `0`
@@ -96,7 +95,7 @@ class IndividualKeepPolicy(BaseModel):
     )
 
 
-class LatestSemverKeepers(BaseModel):
+class LatestSemverKeepers(CamelCaseModel):
     """How to choose items to keep for latest major semver release.
     Default is "do not purge".
     """
@@ -136,7 +135,7 @@ class LatestSemverKeepers(BaseModel):
     ]
 
 
-class OlderSemverKeepers(BaseModel):
+class OlderSemverKeepers(CamelCaseModel):
     """How to choose items to keep for previous major semver releases.
     Default is "do not purge".
     """
@@ -262,7 +261,7 @@ class RSPKeepers(CamelCaseModel):
     ]
 
 
-class KeepPolicy(BaseModel):
+class KeepPolicy(CamelCaseModel):
     """How to choose which images within each image category to keep.
     The default is to purge nothing.
     """
@@ -407,7 +406,7 @@ class RegistryConfig(CamelCaseModel):
     ] = None
 
 
-class Config(BaseModel):
+class Config(CamelCaseModel):
     """Configuration for multiple registries."""
 
     registries: Annotated[
