@@ -38,6 +38,7 @@ class Reaper:
         self._namespace = cfg.namespace
         self._category = cfg.category
         self._category = cfg.category
+        self._skip_tags = set(cfg.skip_tags)
         self._auth = RegistryAuth()
         self._image_version_class = cfg.image_version_class
         self._storage: ContainerRegistryClient | None = None
@@ -149,6 +150,12 @@ class Reaper:
         now = datetime.datetime.now(tz=datetime.UTC)
         cutoff = now - age
         for dig, img in imgs.items():
+            if img.tags & self._skip_tags:
+                self._logger.info(
+                    f"{img.tags} has members in {self._skip_tags}; not"
+                    "considering"
+                )
+                continue
             if img.date is None:
                 self._logger.warning(f"Image '{dig}' has no date")
                 continue
@@ -160,7 +167,13 @@ class Reaper:
         self, keep_count: int, imgs: dict[str, Image]
     ) -> dict[str, Image]:
         # Categorized images are already sorted
-        return {x.digest: x for x in list(imgs.values())[keep_count:]}
+        # Filter out tags to skip
+        filtered = {
+            x.digest: x
+            for x in list(imgs.values())
+            if not x.tags & self._skip_tags
+        }
+        return {x.digest: x for x in list(filtered.values())[keep_count:]}
 
     def report(self) -> None:
         """Report on images which would be purged by plan execution."""

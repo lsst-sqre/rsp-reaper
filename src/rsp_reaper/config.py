@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, ClassVar, Self
 
 import yaml
 from pydantic import (
@@ -365,6 +365,19 @@ class RegistryConfig(CamelCaseModel):
             description="Authentication details for specified registry.",
         ),
     ] = None
+
+    skip_tags: ClassVar[
+        Annotated[
+            set[str],
+            Field(
+                title="Skip tags",
+                description=(
+                    "If an image has any of these tags, mark it as "
+                    "exempt from reaping"
+                ),
+            ),
+        ]
+    ] = set()
 
     dry_run: Annotated[
         bool,
