@@ -20,9 +20,8 @@ with TemporaryDirectory() as td:
     new_config = Path(td) / "config.yaml"
     support_dir = Path(__file__).parent.parent / "tests" / "support"
     config = yaml.safe_load((support_dir / "config.yaml").read_text())
-    config["registries"][0]["input_file"] = None
-    config["registries"][1]["input_file"] = None
-    config["registries"][2]["input_file"] = None
+    config["registries"][0]["inputFile"] = None
+    config["registries"][1]["inputFile"] = None
     new_config.write_text(yaml.dump(config))
 
     cfg = Config.from_file(new_config)

@@ -79,3 +79,7 @@ Yes, of course the whole thing is going to be stuffed absolutely full of
 Blue Öyster Cult jokes.  That might even be a primary motivation for
 writing it in the first place.
 
+## PR
+
+This is some text to change so I can do repeated image builds from a PR.
+Serial #1.

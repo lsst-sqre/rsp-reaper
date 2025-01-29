@@ -208,6 +208,10 @@ class Image:
             self_dict["date"] = None
         else:
             self_dict["date"] = self.date.strftime(DATEFMT)
+        # Eliminate the reconstitutable fields
+        for fld in ("rsp_image_tag", "semver_tag", "version_class"):
+            if fld in self_dict:
+                del self_dict[fld]
         return self_dict
 
     def to_json(self) -> str:

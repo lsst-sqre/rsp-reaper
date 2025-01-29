@@ -180,3 +180,43 @@ def test_which_victims(ghcr_cfg: RegistryConfig) -> None:
     assert r._plan is not None
     assert new_weekly not in r._plan
     assert old_weekly in r._plan
+
+
+def test_skip_tags(ghcr_cfg: RegistryConfig) -> None:
+    """Test that skipping requested tags works."""
+    new_cfg = deepcopy(ghcr_cfg)
+    kp = KeepPolicy(
+        semver=None,
+        untagged=IndividualKeepPolicy(number=0),
+        rsp=RSPKeepers(
+            release=IndividualKeepPolicy(number=0),
+            weekly=IndividualKeepPolicy(number=0),
+            daily=IndividualKeepPolicy(number=0),
+            release_candidate=IndividualKeepPolicy(number=0),
+            experimental=IndividualKeepPolicy(number=0),
+            unknown=IndividualKeepPolicy(number=0),
+        ),
+    )
+    new_cfg.keep = kp
+    r = Reaper(cfg=new_cfg)
+    r.populate()
+    r.plan()
+    remainder = r.remaining()
+    assert len(remainder.rsp["weekly"]) == 0
+    initial = r._categorized
+    assert len(initial.rsp["weekly"]) > 0
+    tag = ""
+    # Find the first weekly tag, and exclude it from consideration.
+    for img in initial.rsp["weekly"].values():
+        for t in img.tags:
+            if t.startswith("w_"):
+                tag = t
+                break
+    assert tag != ""
+    r._skip_tags = {tag}
+    r.plan()
+    remainder = r.remaining()
+    assert len(remainder.rsp["weekly"]) == 1
+    for img in remainder.rsp["weekly"].values():
+        assert img.tags & r._skip_tags
+        assert tag in img.tags

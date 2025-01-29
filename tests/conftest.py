@@ -93,10 +93,10 @@ def test_config() -> Iterator[Path]:
         new_config = Path(td) / "config.yaml"
         support_dir = Path(__file__).parent / "support"
         config = yaml.safe_load((support_dir / "config.yaml").read_text())
-        config["registries"][0]["input_file"] = str(
+        config["registries"][0]["inputFile"] = str(
             support_dir / "ghcr.io.contents.json"
         )
-        config["registries"][1]["input_file"] = str(
+        config["registries"][1]["inputFile"] = str(
             support_dir / "docker.io.contents.json"
         )
         new_config.write_text(yaml.dump(config))

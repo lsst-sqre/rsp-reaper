@@ -47,10 +47,16 @@ registries:
          age: "30d"
        unknown:
          age: "7d"
-   image_version_class: "rsp"
-   dry_run: True
+   imageVersionClass: "rsp"
+   dryRun: True
    debug: True
-   input_file: "ghcr.io.contents.json"
+   inputFile: "ghcr.io.contents.json"
+   skipTags:
+     - "recommended"
+     - "latest"
+     - "latest_release"
+     - "latest_weekly"
+     - "latest_daily"
  - category: "hub.docker.com"
    registry: "https://docker.io"
    owner: "lsstsqre"
@@ -72,7 +78,13 @@ registries:
          age: "30d"
        unknown:
          age: "7d"
-   image_version_class: "rsp"
-   dry_run: True
+   imageVersionClass: "rsp"
+   dryRun: True
    debug: True
-   input_file: "docker.io.contents.json"
+   inputFile: "docker.io.contents.json"
+   skipTags:
+     - "recommended"
+     - "latest"
+     - "latest_release"
+     - "latest_weekly"
+     - "latest_daily"

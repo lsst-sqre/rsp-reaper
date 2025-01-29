@@ -36,12 +36,26 @@ def _parse_args() -> argparse.Namespace:
         default=False,
     )
     parser.add_argument(
+        "-s",
+        "--skip-tags",
+        help=(
+            "exclude images with these tags from consideration for"
+            " reaping (comma-separated list)"
+        ),
+        default="",
+    )
+
+    parser.add_argument(
         "-i",
         "--interactive",
         action="store_true",
         help="Load config and then drop into Python REPL",
         default=False,
     )
+    result = parser.parse_args()
+    if result.skip_tags:
+        result.skip_tags = set(result.skip_tags.split(","))
+
     return parser.parse_args()
 
 
