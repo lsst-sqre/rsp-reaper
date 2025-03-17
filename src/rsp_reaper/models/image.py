@@ -255,7 +255,7 @@ class Image:
         """Much painful assertion that each field is the right type."""
         if isinstance(inp, str):
             obj = json.loads(inp)
-            inp = cast(JSONImage, obj)
+            inp = cast("JSONImage", obj)
         new_date: datetime.datetime | None = None
         if not isinstance(inp["digest"], str):
             raise TypeError(f"'digest' field of {inp} must be a string")

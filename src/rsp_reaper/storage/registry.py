@@ -218,10 +218,10 @@ class ContainerRegistryClient:
             # List of digests
             if isinstance(item, str):
                 # They better not be mixed.
-                imgstrs = cast(list[str], inp)
+                imgstrs = cast("list[str]", inp)
                 return {x: self._images[x] for x in imgstrs}
             # List of Images
-            imgs = cast(list[Image], inp)
+            imgs = cast("list[Image]", inp)
             return {x.digest: x for x in imgs}
 
         # Single items
