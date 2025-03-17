@@ -125,7 +125,7 @@ class GARClient(ContainerRegistryClient):
         self._images = {}
         count = 0
         for digest in jsons:
-            obj = cast(JSONImage, jsons[digest])
+            obj = cast("JSONImage", jsons[digest])
             self._images[digest] = Image.from_json(obj)
             count += 1
         self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")

@@ -100,7 +100,7 @@ class GhcrClient(ContainerRegistryClient):
         count = 0
         for digest in jsons:
             id = jsons[digest]["id"]
-            obj = cast(JSONImage, jsons[digest])
+            obj = cast("JSONImage", jsons[digest])
             img = Image.from_json(obj)
             self._images[digest] = img
             self._image_by_id[id] = img

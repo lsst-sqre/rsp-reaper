@@ -114,7 +114,7 @@ class DockerHubClient(ContainerRegistryClient):
         count = 0
         for digest in jsons:
             count += 1
-            obj = cast(JSONImage, jsons[digest])
+            obj = cast("JSONImage", jsons[digest])
             self._images[digest] = Image.from_json(obj)
         self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
 
