@@ -18,8 +18,14 @@ classifiers = [
     "Typing :: Typed",
 ]
 requires-python = ">=3.12"
-# Use requirements/main.in for runtime dependencies instead.
-dependencies = []
+dependencies = [
+    "google-cloud-artifact-registry",
+    "httpx",
+    "pyyaml",
+    "safir",
+    "semver",
+    "structlog",
+]
 dynamic = ["version"]
 
 [project.scripts]
@@ -32,7 +38,26 @@ Source = "https://github.com/lsst-sqre/rsp-reaper"
 requires = ["setuptools>=61", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools_scm]
+[dependency-groups]
+dev = [
+    "coverage[toml]>=5.0.2",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+]
+lint = [
+    "pre-commit",
+    "pre-commit-uv",
+    "ruff",
+]
+tox = [
+    "tox>=4.24",
+    "tox-uv>=1.25",
+]
+typing = [
+    "mypy",
+    "types-pyyaml",
+]
 
 [tool.black]
 line-length = 79
@@ -156,3 +181,5 @@ extend-immutable-calls = [
     "fastapi.Path",
     "fastapi.Query",
 ]
+
+[tool.setuptools_scm]

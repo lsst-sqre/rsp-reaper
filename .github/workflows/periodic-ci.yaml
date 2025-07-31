@@ -1,8 +1,15 @@
-# This is a separate run of the Python test suite that doesn't cache the tox
-# environment and runs from a schedule. The purpose is to test whether
-# updating pinned dependencies would cause any tests to fail.
+# This is a separate run of the Python test suite that runs from a schedule,
+# doesn't cache the tox environment, and updates pinned dependencies first.
+# The purpose is to test compatibility with the latest versions of
+# dependencies.
 
 name: Periodic CI
+
+env:
+  # Current supported uv version. The uv documentation recommends pinning
+  # this. The version should match the version used in .pre-commit-config.yaml
+  # and frozen in uv.lock. It is updated by make update-deps.
+  UV_VERSION: "0.8.4"
 
 "on":
   schedule:
@@ -12,33 +19,29 @@ name: Periodic CI
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    strategy:
-      matrix:
-        python:
-          - "3.12"
-          - "3.13"
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
 
-      # Use the oldest supported version of Python to update dependencies,
-      # not the matrixed Python version, since this accurately reflects
-      # how dependencies should later be updated.
-      - uses: lsst-sqre/run-neophile@v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          mode: update
+          python-version-file: ".python-version"
 
-      - uses: lsst-sqre/run-tox@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ matrix.python }}
-          tox-envs: "lint,typing,py"
-          use-cache: false
+          version: ${{ env.UV_VERSION }}
+
+      - name: Update dependencies
+        run: make update-deps
+
+      - name: Run tox
+        run: uv run --only-group=tox tox run -e lint,typing,py
 
       - name: Report status
-        if: always()
+        if: failure()
         uses: ravsamhq/notify-slack-action@v2
         with:
           status: ${{ job.status }}
