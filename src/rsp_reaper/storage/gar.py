@@ -63,7 +63,7 @@ class GARClient(ContainerRegistryClient):
             self._logger.debug(
                 f"Requesting {self._owner}/{self._namespace}/"
                 f"{self._repository}: images "
-                f"{count*page_size + 1}-{(count+1) * page_size}"
+                f"{count * page_size + 1}-{(count + 1) * page_size}"
             )
             resp = self._client.list_docker_images(request=request)
             images.extend(list(resp.docker_images))
@@ -128,7 +128,7 @@ class GARClient(ContainerRegistryClient):
             obj = cast("JSONImage", jsons[digest])
             self._images[digest] = Image.from_json(obj)
             count += 1
-        self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
+        self._logger.debug(f"Ingested {count} image{'s' if count > 1 else ''}")
 
     def _image_to_name(self, img: Image) -> str:
         return (

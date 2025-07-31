@@ -50,7 +50,7 @@ class GhcrClient(ContainerRegistryClient):
         while True:
             self._logger.debug(
                 f"Requesting {self._owner}/{self._repository}: images "
-                f"{(page -1) *page_size + 1}-{page * page_size}"
+                f"{(page - 1) * page_size + 1}-{page * page_size}"
             )
             params["page"] = page
             r = self._http_client.get(url, params=params)
@@ -105,7 +105,7 @@ class GhcrClient(ContainerRegistryClient):
             self._images[digest] = img
             self._image_by_id[id] = img
             count += 1
-        self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
+        self._logger.debug(f"Ingested {count} image{'s' if count > 1 else ''}")
 
     def delete_images(self, inp: ImageSpec) -> None:
         images = self._canonicalize_image_map(inp)

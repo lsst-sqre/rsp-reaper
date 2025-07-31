@@ -22,7 +22,6 @@ class Reaper:
     """Provides the mechanism to implement an image retention policy."""
 
     def __init__(self, cfg: RegistryConfig) -> None:
-
         # Establish debugging and dry-run first.
         self._debug = cfg.debug
         self._dry_run = cfg.dry_run

@@ -58,7 +58,7 @@ class DockerHubClient(ContainerRegistryClient):
         while next_page:
             self._logger.debug(
                 f"Requesting {self._owner}/{self._repository}: images "
-                f"{count*page_size + 1}-{(count+1) * page_size}"
+                f"{count * page_size + 1}-{(count + 1) * page_size}"
             )
             if count > 0:
                 params["page"] = count + 1
@@ -116,7 +116,7 @@ class DockerHubClient(ContainerRegistryClient):
             count += 1
             obj = cast("JSONImage", jsons[digest])
             self._images[digest] = Image.from_json(obj)
-        self._logger.debug(f"Ingested {count} image{ 's' if count>1 else ''}")
+        self._logger.debug(f"Ingested {count} image{'s' if count > 1 else ''}")
 
     def delete_images(self, inp: ImageSpec) -> None:
         """Delete images.
