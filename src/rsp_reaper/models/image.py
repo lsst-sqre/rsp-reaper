@@ -80,6 +80,9 @@ class Image:
             return f"[{self.rsp_image_tag.tag}] {dig}"
         return f"[<untagged>] {dig}"
 
+    def __hash__(self) -> int:
+        return hash(self.tags)
+
     def __eq__(self, other: object) -> bool:
         return self._compare(other) == 0
 

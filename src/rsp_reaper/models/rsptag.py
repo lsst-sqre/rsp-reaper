@@ -231,6 +231,9 @@ class RSPImageTag:
         priority[RSPImageType.ALIAS] = 0
         return priority[self.image_type]
 
+    def __hash__(self) -> int:
+        return hash(self.tag)
+
     def __eq__(self, other: object) -> bool:
         return self.compare(other) == 0
 
